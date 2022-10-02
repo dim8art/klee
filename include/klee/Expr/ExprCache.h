@@ -11,8 +11,8 @@ class ExprCache {
 public:
   ExprCache() {};
 	~ExprCache() {};
-	const ref<Expr> CreateExpr(ref<Expr> expression);
+	static const ref<Expr> CreateExpr(ref<Expr> expression);
 private:
-	ExprHashSet cachedExpressions;
+	static ExprHashSet cachedExpressions;
 };
 #endif

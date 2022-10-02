@@ -12,7 +12,7 @@ ExprCache::~ExprCache(){
 }
 
 const ref<Expr> 
-ExprCache::CreateExpr(ref<Expr> expression){
+static const ExprCache::CreateExpr(ref<Expr> expression){
 	std::pair<ExprHashSet::const_iterator, bool> success =
 			cachedExpressions.insert(expression);
 	if (success.second) {
@@ -20,6 +20,6 @@ ExprCache::CreateExpr(ref<Expr> expression){
 		return expression;
 	}
 	//Cache hit
-	expression->~ref<Expr>;
+
 	return *(success.first);
 }
