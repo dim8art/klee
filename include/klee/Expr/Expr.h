@@ -10,6 +10,7 @@
 #ifndef KLEE_EXPR_H
 #define KLEE_EXPR_H
 
+#include "klee/Expr/ExprCache.h"
 #include "klee/ADT/Bits.h"
 #include "klee/ADT/Ref.h"
 #include "llvm/ADT/APFloat.h"
@@ -35,6 +36,7 @@ class Array;
 class ArrayCache;
 class ConstantExpr;
 class ObjectState;
+class ExprCache;
 
 template<class T> class ref;
 
@@ -423,7 +425,7 @@ public:
   static ref<Expr> alloc(const ref<Expr> &src) {
     ref<Expr> r(new NotOptimizedExpr(src));
     r->computeHash();
-    return r;
+    return ExprCache::CreateExpr(r);
   }
   
   static ref<Expr> create(ref<Expr> src);
@@ -581,7 +583,7 @@ public:
   static ref<Expr> alloc(const UpdateList &updates, const ref<Expr> &index) {
     ref<Expr> r(new ReadExpr(updates, index));
     r->computeHash();
-    return r;
+    return ExprCache::CreateExpr(r);
   }
   
   static ref<Expr> create(const UpdateList &updates, ref<Expr> i);
@@ -626,7 +628,7 @@ public:
                          const ref<Expr> &f) {
     ref<Expr> r(new SelectExpr(c, t, f));
     r->computeHash();
-    return r;
+    return ExprCache::CreateExpr(r);
   }
   
   static ref<Expr> create(ref<Expr> c, ref<Expr> t, ref<Expr> f);
@@ -689,7 +691,7 @@ public:
   static ref<Expr> alloc(const ref<Expr> &l, const ref<Expr> &r) {
     ref<Expr> c(new ConcatExpr(l, r));
     c->computeHash();
-    return c;
+    return ExprCache::CreateExpr(c);
   }
   
   static ref<Expr> create(const ref<Expr> &l, const ref<Expr> &r);
@@ -756,7 +758,7 @@ public:
   static ref<Expr> alloc(const ref<Expr> &e, unsigned o, Width w) {
     ref<Expr> r(new ExtractExpr(e, o, w));
     r->computeHash();
-    return r;
+    return ExprCache::CreateExpr(r);
   }
   
   /// Creates an ExtractExpr with the given bit offset and width
@@ -807,7 +809,7 @@ public:
   static ref<Expr> alloc(const ref<Expr> &e) {
     ref<Expr> r(new NotExpr(e));
     r->computeHash();
-    return r;
+    return ExprCache::CreateExpr(r);
   }
   
   static ref<Expr> create(const ref<Expr> &e);
@@ -884,7 +886,7 @@ public:                                                          \
     static ref<Expr> alloc(const ref<Expr> &e, Width w) {        \
       ref<Expr> r(new _class_kind ## Expr(e, w));                \
       r->computeHash();                                          \
-      return r;                                                  \
+      return ExprCache::CreateExpr(r);                                                  \
     }                                                            \
     static ref<Expr> create(const ref<Expr> &e, Width w);        \
     Kind getKind() const { return _class_kind; }                 \
@@ -917,7 +919,7 @@ CAST_EXPR_CLASS(ZExt)
     static ref<Expr> alloc(const ref<Expr> &l, const ref<Expr> &r) {           \
       ref<Expr> res(new _class_kind##Expr(l, r));                              \
       res->computeHash();                                                      \
-      return res;                                                              \
+      return ExprCache::CreateExpr(res);                                                              \
     }                                                                          \
     static ref<Expr> create(const ref<Expr> &l, const ref<Expr> &r);           \
     Width getWidth() const { return left->getWidth(); }                        \
@@ -966,7 +968,7 @@ ARITHMETIC_EXPR_CLASS(AShr)
     static ref<Expr> alloc(const ref<Expr> &l, const ref<Expr> &r) {           \
       ref<Expr> res(new _class_kind##Expr(l, r));                              \
       res->computeHash();                                                      \
-      return res;                                                              \
+      return ExprCache::CreateExpr(res);                                                              \
     }                                                                          \
     static ref<Expr> create(const ref<Expr> &l, const ref<Expr> &r);           \
     Kind getKind() const { return _class_kind; }                               \
@@ -1071,7 +1073,7 @@ public:
   static ref<ConstantExpr> alloc(const llvm::APInt &v) {
     ref<ConstantExpr> r(new ConstantExpr(v));
     r->computeHash();
-    return r;
+    return ExprCache::CreateExpr(r);
   }
 
   static ref<ConstantExpr> alloc(const llvm::APFloat &f) {
