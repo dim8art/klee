@@ -10,7 +10,7 @@
 #ifndef KLEE_EXPR_H
 #define KLEE_EXPR_H
 
-#include "klee/Expr/ExprCache.h"
+
 #include "klee/ADT/Bits.h"
 #include "klee/ADT/Ref.h"
 #include "llvm/ADT/APFloat.h"
@@ -695,6 +695,8 @@ public:
   }
   
   static ref<Expr> create(const ref<Expr> &l, const ref<Expr> &r);
+
+
 
   Width getWidth() const { return width; }
   Kind getKind() const { return kind; }
