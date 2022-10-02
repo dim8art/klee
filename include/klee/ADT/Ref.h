@@ -218,7 +218,7 @@ public:
     assert(!isNull() && !rhs.isNull() && "Invalid call to compare()");
     return get()->compare(*rhs.get());
   }
-
+ 
   // assumes non-null arguments
   bool operator<(const ref &rhs) const { return compare(rhs)<0; }
   bool operator==(const ref &rhs) const { return compare(rhs)==0; }

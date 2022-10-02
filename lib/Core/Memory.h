@@ -158,7 +158,9 @@ public:
 
     return 0;
   }
+
 };
+
 
 class ObjectState {
 private:

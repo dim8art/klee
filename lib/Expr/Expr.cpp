@@ -100,8 +100,14 @@ int Expr::compare(const Expr &b) const {
   return r;
 }
 
+
 // returns 0 if b is structurally equal to *this
+
 int Expr::compare(const Expr &b, ExprEquivSet &equivs) const {
+
+  if (toBeCleared() || b.toBeCleared())
+    return this == &b ? 0 : 1;
+
   if (this == &b) return 0;
 
   const Expr *ap, *bp;
@@ -121,6 +127,9 @@ int Expr::compare(const Expr &b, ExprEquivSet &equivs) const {
   if (hashValue != b.hashValue) 
     return (hashValue < b.hashValue) ? -1 : 1;
 
+  if (isCached() && b.isCached())
+    return 0;
+
   if (int res = compareContents(b)) 
     return res;
 
@@ -128,10 +137,11 @@ int Expr::compare(const Expr &b, ExprEquivSet &equivs) const {
   for (unsigned i=0; i<aN; i++)
     if (int res = getKid(i)->compare(*b.getKid(i), equivs))
       return res;
-
   equivs.insert(std::make_pair(ap, bp));
+
   return 0;
 }
+
 
 void Expr::printKind(llvm::raw_ostream &os, Kind k) {
   switch(k) {
@@ -336,6 +346,40 @@ void Expr::dump() const {
   errs() << "\n";
 }
 
+/***/
+ExprCache::ExprCacheSet ExprCache::cachedExpressions;
+
+Expr::~Expr() {
+  Expr::count--;
+  setToBeCleared(true);
+  ExprCache::cachedExpressions.erase(this);
+}
+
+ConstantExpr::~ConstantExpr() {
+  setToBeCleared(true);
+  ExprCache::cachedExpressions.erase(this);
+}
+
+ExprCache::~ExprCache() {
+  for (ExprCacheSet::iterator ai = cachedExpressions.begin(),
+                              e = cachedExpressions.end();
+       ai != e; ai++)
+    delete *ai;
+}
+
+ref<Expr> ExprCache::CreateCachedExpr(const ref<Expr> &e) {
+
+  std::pair<ExprCacheSet::const_iterator, bool> success =
+      cachedExpressions.insert(e.get());
+
+  if (success.second) {
+    // Cache miss
+    e->setCached(true);
+    return e;
+  }
+  // Cache hit
+  return (ref<Expr>)*(success.first);
+}
 /***/
 
 ref<Expr> ConstantExpr::fromMemory(void *address, Width width) {

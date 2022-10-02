@@ -10,6 +10,7 @@
 #ifndef KLEE_EXPR_H
 #define KLEE_EXPR_H
 
+
 #include "klee/ADT/Bits.h"
 #include "klee/ADT/Ref.h"
 #include "llvm/ADT/APFloat.h"
@@ -23,7 +24,8 @@
 #include <set>
 #include <vector>
 #include <map>
-
+#include <unordered_set>
+#include <unordered_map>
 namespace llvm {
   class Type;
   class raw_ostream;
@@ -35,6 +37,8 @@ class Array;
 class ArrayCache;
 class ConstantExpr;
 class ObjectState;
+class Expr;
+class ExprCache;
 
 template<class T> class ref;
 
@@ -83,12 +87,24 @@ The general rules are:
    -# Add case to printKind
    -# Add to ExprVisitor
    -# Add to IVC (implied value concretization) if possible
-
+s
 Todo: Shouldn't bool \c Xor just be written as not equal?
 
 */
 
+
 class Expr {
+
+private:
+  bool cached = false;
+  bool toBeClearedFlag = false;
+
+public:
+  void setToBeCleared(bool value) { toBeClearedFlag = value; }
+  bool toBeCleared() const { return toBeClearedFlag; }
+  bool isCached() const { return cached; }
+  void setCached(bool value) { cached = value; }
+
 public:
   static unsigned count;
   static const unsigned MAGIC_HASH_CONSTANT = 39;
@@ -184,7 +200,6 @@ public:
 
 protected:  
   unsigned hashValue;
-
   /// Compares `b` to `this` Expr and determines how they are ordered
   /// (ignoring their kid expressions - i.e. those returned by `getKid()`).
   ///
@@ -211,7 +226,7 @@ protected:
 
 public:
   Expr() { Expr::count++; }
-  virtual ~Expr() { Expr::count--; } 
+  virtual ~Expr();
 
   virtual Kind getKind() const = 0;
   virtual Width getWidth() const = 0;
@@ -244,6 +259,7 @@ public:
   /// * 1 iff `this` is `>` `b`
   ///
   /// `<` and `>` are binary relations that express the total order.
+
   int compare(const Expr &b) const;
 
   // Given an array of new kids return a copy of the expression
@@ -294,7 +310,10 @@ public:
 private:
   typedef llvm::DenseSet<std::pair<const Expr *, const Expr *> > ExprEquivSet;
   int compare(const Expr &b, ExprEquivSet &equivs) const;
+
+
 };
+
 
 struct Expr::CreateArg {
   ref<Expr> expr;
@@ -332,6 +351,27 @@ inline bool operator<=(const Expr &lhs, const Expr &rhs) {
 inline bool operator>=(const Expr &lhs, const Expr &rhs) {
   return !(lhs < rhs);
 }
+
+class ExprCache {
+public:
+  /// creating method to cache expressions
+  ExprCache(){};
+  ~ExprCache();
+
+private:
+  struct ExprHash {
+    unsigned operator()(Expr *const e) const { return e->hash(); }
+  };
+
+  struct ExprCmp {
+    bool operator()(Expr *const a, Expr *const b) const { return (*a) == (*b); }
+  };
+
+public:
+  typedef std::unordered_set<Expr *, ExprHash, ExprCmp> ExprCacheSet;
+  static ExprCacheSet cachedExpressions;
+  static ref<Expr> CreateCachedExpr(const ref<Expr> &e);
+};
 
 // Printing operators
 
@@ -423,7 +463,7 @@ public:
   static ref<Expr> alloc(const ref<Expr> &src) {
     ref<Expr> r(new NotOptimizedExpr(src));
     r->computeHash();
-    return r;
+    return ExprCache::CreateCachedExpr(r);
   }
   
   static ref<Expr> create(ref<Expr> src);
@@ -581,7 +621,7 @@ public:
   static ref<Expr> alloc(const UpdateList &updates, const ref<Expr> &index) {
     ref<Expr> r(new ReadExpr(updates, index));
     r->computeHash();
-    return r;
+    return ExprCache::CreateCachedExpr(r);
   }
   
   static ref<Expr> create(const UpdateList &updates, ref<Expr> i);
@@ -626,7 +666,7 @@ public:
                          const ref<Expr> &f) {
     ref<Expr> r(new SelectExpr(c, t, f));
     r->computeHash();
-    return r;
+    return ExprCache::CreateCachedExpr(r);
   }
   
   static ref<Expr> create(ref<Expr> c, ref<Expr> t, ref<Expr> f);
@@ -689,10 +729,12 @@ public:
   static ref<Expr> alloc(const ref<Expr> &l, const ref<Expr> &r) {
     ref<Expr> c(new ConcatExpr(l, r));
     c->computeHash();
-    return c;
+    return ExprCache::CreateCachedExpr(c);
   }
   
   static ref<Expr> create(const ref<Expr> &l, const ref<Expr> &r);
+
+
 
   Width getWidth() const { return width; }
   Kind getKind() const { return kind; }
@@ -756,7 +798,7 @@ public:
   static ref<Expr> alloc(const ref<Expr> &e, unsigned o, Width w) {
     ref<Expr> r(new ExtractExpr(e, o, w));
     r->computeHash();
-    return r;
+    return ExprCache::CreateCachedExpr(r);
   }
   
   /// Creates an ExtractExpr with the given bit offset and width
@@ -807,7 +849,7 @@ public:
   static ref<Expr> alloc(const ref<Expr> &e) {
     ref<Expr> r(new NotExpr(e));
     r->computeHash();
-    return r;
+    return ExprCache::CreateCachedExpr(r);
   }
   
   static ref<Expr> create(const ref<Expr> &e);
@@ -884,7 +926,7 @@ public:                                                          \
     static ref<Expr> alloc(const ref<Expr> &e, Width w) {        \
       ref<Expr> r(new _class_kind ## Expr(e, w));                \
       r->computeHash();                                          \
-      return r;                                                  \
+      return ExprCache::CreateCachedExpr(r);                                                  \
     }                                                            \
     static ref<Expr> create(const ref<Expr> &e, Width w);        \
     Kind getKind() const { return _class_kind; }                 \
@@ -917,7 +959,7 @@ CAST_EXPR_CLASS(ZExt)
     static ref<Expr> alloc(const ref<Expr> &l, const ref<Expr> &r) {           \
       ref<Expr> res(new _class_kind##Expr(l, r));                              \
       res->computeHash();                                                      \
-      return res;                                                              \
+      return ExprCache::CreateCachedExpr(res);                                                              \
     }                                                                          \
     static ref<Expr> create(const ref<Expr> &l, const ref<Expr> &r);           \
     Width getWidth() const { return left->getWidth(); }                        \
@@ -966,7 +1008,7 @@ ARITHMETIC_EXPR_CLASS(AShr)
     static ref<Expr> alloc(const ref<Expr> &l, const ref<Expr> &r) {           \
       ref<Expr> res(new _class_kind##Expr(l, r));                              \
       res->computeHash();                                                      \
-      return res;                                                              \
+      return ExprCache::CreateCachedExpr(res);                                                              \
     }                                                                          \
     static ref<Expr> create(const ref<Expr> &l, const ref<Expr> &r);           \
     Kind getKind() const { return _class_kind; }                               \
@@ -1010,7 +1052,7 @@ private:
   ConstantExpr(const llvm::APInt &v) : value(v) {}
 
 public:
-  ~ConstantExpr() {}
+  ~ConstantExpr();
 
   Width getWidth() const { return value.getBitWidth(); }
   Kind getKind() const { return Constant; }
@@ -1071,7 +1113,7 @@ public:
   static ref<ConstantExpr> alloc(const llvm::APInt &v) {
     ref<ConstantExpr> r(new ConstantExpr(v));
     r->computeHash();
-    return r;
+    return ExprCache::CreateCachedExpr(r);
   }
 
   static ref<ConstantExpr> alloc(const llvm::APFloat &f) {
