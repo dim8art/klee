@@ -11,8 +11,8 @@ ExprCache::~ExprCache(){
 			}
 }
 
-const ref<Expr> 
-static const ExprCache::CreateExpr(ref<Expr> expression){
+static const ref<Expr> 
+ExprCache::CreateExpr(ref<Expr> expression){
 	std::pair<ExprHashSet::const_iterator, bool> success =
 			cachedExpressions.insert(expression);
 	if (success.second) {
