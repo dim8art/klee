@@ -1,25 +1,17 @@
 #include "klee/Expr/ExprCache.h"
 
-namespace klee {
+namespace klee{
 
-ExprCache::~ExprCache(){
-	// Free ExprHashSet object
-  for (ExprHashSet::iterator ai = cachedExpressions.begin(),
-														 e = cachedExpressions.end(),
-			ai != e; ++ai) {
-				delete *ai;
-			}
-}
+	ref<Expr> 
+	ExprCache::CreateExpr(const ref<Expr> expression){
+		std::pair<ExprHashSet::const_iterator, bool> success =
+				cachedExpressions.insert(expression);
+		if (success.second) {
+			// Cache miss
+			return expression;
+		}
+		//Cache hit
 
-static const ref<Expr> 
-ExprCache::CreateExpr(ref<Expr> expression){
-	std::pair<ExprHashSet::const_iterator, bool> success =
-			cachedExpressions.insert(expression);
-	if (success.second) {
-		// Cache miss
-		return expression;
+		return *(success.first);
 	}
-	//Cache hit
-
-	return *(success.first);
 }

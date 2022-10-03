@@ -11,6 +11,7 @@
 #define KLEE_SOLVER_H
 
 #include "klee/Expr/Expr.h"
+#include "klee/Expr/ExprCache.h"
 #include "klee/System/Time.h"
 #include "klee/Solver/SolverCmdLine.h"
 
@@ -20,6 +21,7 @@ namespace klee {
   class ConstraintSet;
   class Expr;
   class SolverImpl;
+
 
   /// Collection of meta data that a solver can have access to. This is
   /// independent of the actual constraints but can be used as a two-way

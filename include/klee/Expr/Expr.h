@@ -36,8 +36,8 @@ class Array;
 class ArrayCache;
 class ConstantExpr;
 class ObjectState;
+class Expr;
 class ExprCache;
-
 template<class T> class ref;
 
 extern llvm::cl::OptionCategory ExprCat;
@@ -91,6 +91,7 @@ Todo: Shouldn't bool \c Xor just be written as not equal?
 */
 
 class Expr {
+
 public:
   static unsigned count;
   static const unsigned MAGIC_HASH_CONSTANT = 39;
