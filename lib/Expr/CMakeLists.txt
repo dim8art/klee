@@ -16,7 +16,6 @@ klee_add_component(kleaverExpr
   Constraints.cpp
   ExprBuilder.cpp
   Expr.cpp
-  ExprCache.cpp
   ExprEvaluator.cpp
   ExprPPrinter.cpp
   ExprSMTLIBPrinter.cpp

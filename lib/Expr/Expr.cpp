@@ -336,6 +336,19 @@ void Expr::dump() const {
   errs() << "\n";
 }
 
+ExprCache::_ExprHashSet ExprCache::cachedExpressions;
+
+ref<Expr> ExprCache::CreateCachedExpr(const ref<Expr> &e){
+  std::pair<_ExprHashSet::const_iterator, bool> success =
+                              cachedExpressions.insert(e);
+  if (success.second) {
+    // Cache miss
+    return e;
+  }
+  //Cache hit
+
+  return *(success.first);
+}
 /***/
 
 ref<Expr> ConstantExpr::fromMemory(void *address, Width width) {

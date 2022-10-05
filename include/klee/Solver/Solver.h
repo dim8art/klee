@@ -11,7 +11,6 @@
 #define KLEE_SOLVER_H
 
 #include "klee/Expr/Expr.h"
-#include "klee/Expr/ExprCache.h"
 #include "klee/System/Time.h"
 #include "klee/Solver/SolverCmdLine.h"
 
