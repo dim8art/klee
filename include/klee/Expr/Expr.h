@@ -247,12 +247,16 @@ public:
   /// * 1 iff `this` is `>` `b`
   ///
   /// `<` and `>` are binary relations that express the total order.
+  int equals(const Expr &b) const;
   int compare(const Expr &b) const;
 
   // Given an array of new kids return a copy of the expression
   // but using those children. 
   virtual ref<Expr> rebuild(ref<Expr> kids[/* getNumKids() */]) const = 0;
 
+  /// isCached - Is cached.
+
+  bool isCached = false;
   /// isZero - Is this a constant zero.
   bool isZero() const;
   
@@ -301,24 +305,26 @@ private:
 
 };
 
-class ExprCache{
+class ExprCache {
 public:
   /// creating method to cache expressions
   ExprCache(){};
   ~ExprCache(){};
-  struct _ExprHash  {
-    unsigned operator()(const ref<Expr> &e) const { return e->hash(); }
-  };
-  
-  struct _ExprCmp {
-    bool operator()(const ref<Expr> &a, const ref<Expr> &b) const {
-      return a==b;
-    }
-  };
-  typedef std::unordered_set<ref<Expr>, _ExprHash, _ExprCmp>
-      _ExprHashSet;
-  static _ExprHashSet cachedExpressions;
-  static ref<Expr> CreateCachedExpr(const ref<Expr> &e);
+  private:
+    struct ExprHash  {
+      unsigned operator()(const ref<Expr> &e) const { return e->hash(); }
+    };
+    
+    struct ExprCmp {
+      bool operator()(const ref<Expr> &a, const ref<Expr> &b) const {
+        return a.compare(b) == 0;
+      }
+    };
+  public:
+    typedef std::unordered_set<ref<Expr>, ExprHash, ExprCmp>
+        ExprCacheSet;
+    static ExprCacheSet cachedExpressions;
+    static ref<Expr> CreateCachedExpr(const ref<Expr> &e);
 };
 
 struct Expr::CreateArg {
@@ -335,7 +341,7 @@ struct Expr::CreateArg {
 // Comparison operators
 
 inline bool operator==(const Expr &lhs, const Expr &rhs) {
-  return lhs.compare(rhs) == 0;
+  return lhs.equals(rhs) == 0;
 }
 
 inline bool operator<(const Expr &lhs, const Expr &rhs) {

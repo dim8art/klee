@@ -158,7 +158,12 @@ public:
 
     return 0;
   }
+
+  int equals(const MemoryObject &b) const{
+    return compare(b);
+  }
 };
+
 
 class ObjectState {
 private:

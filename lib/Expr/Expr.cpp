@@ -93,6 +93,11 @@ ref<Expr> Expr::createTempRead(const Array *array, Expr::Width w) {
   }
 }
 
+int Expr::equals(const Expr &b) const {
+  if (this == &b) return 0;
+  return 1;
+}
+
 int Expr::compare(const Expr &b) const {
   static ExprEquivSet equivs;
   int r = compare(b, equivs);
@@ -100,8 +105,10 @@ int Expr::compare(const Expr &b) const {
   return r;
 }
 
+
 // returns 0 if b is structurally equal to *this
 int Expr::compare(const Expr &b, ExprEquivSet &equivs) const {
+
   if (this == &b) return 0;
 
   const Expr *ap, *bp;
@@ -123,13 +130,14 @@ int Expr::compare(const Expr &b, ExprEquivSet &equivs) const {
 
   if (int res = compareContents(b)) 
     return res;
-
-  unsigned aN = getNumKids();
-  for (unsigned i=0; i<aN; i++)
-    if (int res = getKid(i)->compare(*b.getKid(i), equivs))
-      return res;
-
-  equivs.insert(std::make_pair(ap, bp));
+  if (!b.isCached)
+  {
+    unsigned aN = getNumKids();
+    for (unsigned i=0; i<aN; i++)
+      if (int res = getKid(i)->compare(*b.getKid(i), equivs))
+        return res;
+    equivs.insert(std::make_pair(ap, bp));
+  }
   return 0;
 }
 
@@ -336,17 +344,17 @@ void Expr::dump() const {
   errs() << "\n";
 }
 
-ExprCache::_ExprHashSet ExprCache::cachedExpressions;
+ExprCache::ExprCacheSet ExprCache::cachedExpressions;
 
 ref<Expr> ExprCache::CreateCachedExpr(const ref<Expr> &e){
-  std::pair<_ExprHashSet::const_iterator, bool> success =
+  std::pair<ExprCacheSet::const_iterator, bool> success =
                               cachedExpressions.insert(e);
   if (success.second) {
     // Cache miss
+    e->isCached = true;
     return e;
   }
   //Cache hit
-
   return *(success.first);
 }
 /***/
