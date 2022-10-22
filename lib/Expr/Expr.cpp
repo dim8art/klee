@@ -128,16 +128,18 @@ int Expr::compare(const Expr &b, ExprEquivSet &equivs) const {
   if (hashValue != b.hashValue) 
     return (hashValue < b.hashValue) ? -1 : 1;
 
+  if (b.isCached && this->isCached) return -1;
+
   if (int res = compareContents(b)) 
     return res;
-  if (!b.isCached)
-  {
-    unsigned aN = getNumKids();
-    for (unsigned i=0; i<aN; i++)
-      if (int res = getKid(i)->compare(*b.getKid(i), equivs))
-        return res;
-    equivs.insert(std::make_pair(ap, bp));
-  }
+    
+
+  unsigned aN = getNumKids();
+  for (unsigned i=0; i<aN; i++)
+    if (int res = getKid(i)->compare(*b.getKid(i), equivs))
+      return res;
+  equivs.insert(std::make_pair(ap, bp));
+
   return 0;
 }
 

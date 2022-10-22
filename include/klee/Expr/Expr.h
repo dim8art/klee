@@ -254,7 +254,7 @@ public:
   // but using those children. 
   virtual ref<Expr> rebuild(ref<Expr> kids[/* getNumKids() */]) const = 0;
 
-  /// isCached - Is cached.
+  /// temporary cache variables
 
   bool isCached = false;
   /// isZero - Is this a constant zero.
