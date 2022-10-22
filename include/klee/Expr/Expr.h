@@ -25,7 +25,7 @@
 #include <vector>
 #include <map>
 #include <unordered_set>
-
+#include <unordered_map>
 namespace llvm {
   class Type;
   class raw_ostream;
@@ -256,7 +256,7 @@ public:
 
   /// temporary cache variables
 
-  bool isCached = false;
+
   /// isZero - Is this a constant zero.
   bool isZero() const;
   
@@ -302,7 +302,12 @@ private:
   typedef llvm::DenseSet<std::pair<const Expr *, const Expr *> > ExprEquivSet;
   int compare(const Expr &b, ExprEquivSet &equivs) const;
 
+private:
+  bool cached = false;
 
+public:
+  bool isCached() const { return cached; }
+  void setCached(bool value) { cached = value; }
 };
 
 class ExprCache {
@@ -322,8 +327,10 @@ public:
     };
   public:
     typedef std::unordered_set<ref<Expr>, ExprHash, ExprCmp>
-        ExprCacheSet;
-    static ExprCacheSet cachedExpressions;
+      ExprCacheSet;
+    typedef std::unordered_map<ref<Expr>, int, ExprHash, ExprCmp>
+      ExprCacheMap;
+    static ExprCacheMap cachedExpressions;
     static ref<Expr> CreateCachedExpr(const ref<Expr> &e);
 };
 

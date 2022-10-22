@@ -128,7 +128,7 @@ int Expr::compare(const Expr &b, ExprEquivSet &equivs) const {
   if (hashValue != b.hashValue) 
     return (hashValue < b.hashValue) ? -1 : 1;
 
-  if (b.isCached && this->isCached) return -1;
+  if (b.isCached() && isCached()) return -1;
 
   if (int res = compareContents(b)) 
     return res;
@@ -346,18 +346,21 @@ void Expr::dump() const {
   errs() << "\n";
 }
 
-ExprCache::ExprCacheSet ExprCache::cachedExpressions;
+ExprCache::ExprCacheMap ExprCache::cachedExpressions;
 
 ref<Expr> ExprCache::CreateCachedExpr(const ref<Expr> &e){
-  std::pair<ExprCacheSet::const_iterator, bool> success =
-                              cachedExpressions.insert(e);
+  std::pair<ExprCacheMap::const_iterator, bool> success =
+                              cachedExpressions.insert({e, 1});
   if (success.second) {
     // Cache miss
-    e->isCached = true;
+    e->setCached(true);
     return e;
   }
+
   //Cache hit
-  return *(success.first);
+  ref<Expr> res = (*(success.first)).first
+  cachedExpressions[res]++;
+  return res;
 }
 /***/
 
