@@ -343,7 +343,15 @@ void Expr::dump() const {
 
 ExprCache::ExprCacheSet ExprCache::cachedExpressions;
 
+Expr::~Expr()
+{ 
+    Expr::count--;
+    if (cacheKey)
+      ExprCache::cachedExpressions.erase(cacheKey); 
+}
+
 ref<Expr> ExprCache::CreateCachedExpr(const ref<Expr> &e){
+  return e;
   std::pair<ExprCacheSet::const_iterator, bool> success =
                              cachedExpressions.insert(e);
   

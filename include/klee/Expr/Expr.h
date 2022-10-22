@@ -39,6 +39,7 @@ class ConstantExpr;
 class ObjectState;
 class Expr;
 class ExprCache;
+
 template<class T> class ref;
 
 extern llvm::cl::OptionCategory ExprCat;
@@ -86,10 +87,11 @@ The general rules are:
    -# Add case to printKind
    -# Add to ExprVisitor
    -# Add to IVC (implied value concretization) if possible
-
+s
 Todo: Shouldn't bool \c Xor just be written as not equal?
 
 */
+
 
 class Expr {
 
@@ -223,7 +225,7 @@ protected:
 
 public:
   Expr() { Expr::count++; }
-  virtual ~Expr() { Expr::count--; } 
+  virtual ~Expr();
 
   virtual Kind getKind() const = 0;
   virtual Width getWidth() const = 0;
