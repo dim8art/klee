@@ -358,7 +358,7 @@ ref<Expr> ExprCache::CreateCachedExpr(const ref<Expr> &e){
   }
 
   //Cache hit
-  ref<Expr> res = (*(success.first)).first
+  ref<Expr> res = (*(success.first)).first;
   cachedExpressions[res]++;
   return res;
 }
