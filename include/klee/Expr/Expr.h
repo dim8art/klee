@@ -91,30 +91,6 @@ Todo: Shouldn't bool \c Xor just be written as not equal?
 
 */
 
-class ExprCache {
-public:
-  /// creating method to cache expressions
-  ExprCache(){};
-  ~ExprCache(){};
-  private:
-    struct ExprHash  {
-      unsigned operator()(const ref<Expr> &e) const { return e->hash(); }
-    };
-    
-    struct ExprCmp {
-      bool operator()(const ref<Expr> &a, const ref<Expr> &b) const {
-        return a.compare(b) == 0;
-      }
-    };
-  public:
-    typedef std::unordered_set<ref<Expr>, ExprHash, ExprCmp>
-      ExprCacheSet;
-    typedef std::unordered_map<ref<Expr>, int, ExprHash, ExprCmp>
-      ExprCacheMap;
-    static ExprCacheMap cachedExpressions;
-    static ref<Expr> CreateCachedExpr(const ref<Expr> &e);
-};
-
 class Expr {
 
 private:
@@ -280,7 +256,7 @@ public:
   /// * 1 iff `this` is `>` `b`
   ///
   /// `<` and `>` are binary relations that express the total order.
-  int equals(const Expr &b) const;
+
   int compare(const Expr &b) const;
 
   // Given an array of new kids return a copy of the expression
@@ -338,7 +314,29 @@ private:
 
 };
 
-
+class ExprCache {
+public:
+  /// creating method to cache expressions
+  ExprCache(){};
+  ~ExprCache(){};
+  private:
+    struct ExprHash  {
+      unsigned operator()(const ref<Expr> &e) const { return e->hash(); }
+    };
+    
+    struct ExprCmp {
+      bool operator()(const ref<Expr> &a, const ref<Expr> &b) const {
+        return a.compare(b) == 0;
+      }
+    };
+  public:
+    typedef std::unordered_set<ref<Expr>, ExprHash, ExprCmp>
+      ExprCacheSet;
+    typedef std::unordered_map<ref<Expr>, int, ExprHash, ExprCmp>
+      ExprCacheMap;
+    static ExprCacheMap cachedExpressions;
+    static ref<Expr> CreateCachedExpr(const ref<Expr> &e);
+};
 
 struct Expr::CreateArg {
   ref<Expr> expr;
@@ -354,7 +352,7 @@ struct Expr::CreateArg {
 // Comparison operators
 
 inline bool operator==(const Expr &lhs, const Expr &rhs) {
-  return lhs.equals(rhs) == 0;
+  return lhs.compare(rhs) == 0;
 }
 
 inline bool operator<(const Expr &lhs, const Expr &rhs) {
