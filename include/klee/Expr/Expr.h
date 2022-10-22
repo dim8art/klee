@@ -91,7 +91,40 @@ Todo: Shouldn't bool \c Xor just be written as not equal?
 
 */
 
+class ExprCache {
+public:
+  /// creating method to cache expressions
+  ExprCache(){};
+  ~ExprCache(){};
+  private:
+    struct ExprHash  {
+      unsigned operator()(const ref<Expr> &e) const { return e->hash(); }
+    };
+    
+    struct ExprCmp {
+      bool operator()(const ref<Expr> &a, const ref<Expr> &b) const {
+        return a.compare(b) == 0;
+      }
+    };
+  public:
+    typedef std::unordered_set<ref<Expr>, ExprHash, ExprCmp>
+      ExprCacheSet;
+    typedef std::unordered_map<ref<Expr>, int, ExprHash, ExprCmp>
+      ExprCacheMap;
+    static ExprCacheMap cachedExpressions;
+    static ref<Expr> CreateCachedExpr(const ref<Expr> &e);
+};
+
 class Expr {
+
+private:
+  bool cached = false;
+  ref<Expr> cacheKey;
+
+public:
+  bool isCached() const { return cached; }
+  void setCached(bool value) { cached = value; }
+  void setCacheKey(ref<Expr> value) { cacheKey = value; }
 
 public:
   static unsigned count;
@@ -302,37 +335,10 @@ private:
   typedef llvm::DenseSet<std::pair<const Expr *, const Expr *> > ExprEquivSet;
   int compare(const Expr &b, ExprEquivSet &equivs) const;
 
-private:
-  bool cached = false;
 
-public:
-  bool isCached() const { return cached; }
-  void setCached(bool value) { cached = value; }
 };
 
-class ExprCache {
-public:
-  /// creating method to cache expressions
-  ExprCache(){};
-  ~ExprCache(){};
-  private:
-    struct ExprHash  {
-      unsigned operator()(const ref<Expr> &e) const { return e->hash(); }
-    };
-    
-    struct ExprCmp {
-      bool operator()(const ref<Expr> &a, const ref<Expr> &b) const {
-        return a.compare(b) == 0;
-      }
-    };
-  public:
-    typedef std::unordered_set<ref<Expr>, ExprHash, ExprCmp>
-      ExprCacheSet;
-    typedef std::unordered_map<ref<Expr>, int, ExprHash, ExprCmp>
-      ExprCacheMap;
-    static ExprCacheMap cachedExpressions;
-    static ref<Expr> CreateCachedExpr(const ref<Expr> &e);
-};
+
 
 struct Expr::CreateArg {
   ref<Expr> expr;
