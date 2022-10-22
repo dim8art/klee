@@ -351,7 +351,7 @@ Expr::~Expr()
 }
 
 ref<Expr> ExprCache::CreateCachedExpr(const ref<Expr> &e){
-  return e;
+
   std::pair<ExprCacheSet::const_iterator, bool> success =
                              cachedExpressions.insert(e);
   
