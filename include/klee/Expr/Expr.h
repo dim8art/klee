@@ -334,7 +334,7 @@ public:
       ExprCacheSet;
     typedef std::unordered_map<ref<Expr>, int, ExprHash, ExprCmp>
       ExprCacheMap;
-    static ExprCacheMap cachedExpressions;
+    static ExprCacheSet cachedExpressions;
     static ref<Expr> CreateCachedExpr(const ref<Expr> &e);
 };
 

@@ -341,20 +341,21 @@ void Expr::dump() const {
   errs() << "\n";
 }
 
-ExprCache::ExprCacheMap ExprCache::cachedExpressions;
+ExprCache::ExprCacheSet ExprCache::cachedExpressions;
 
 ref<Expr> ExprCache::CreateCachedExpr(const ref<Expr> &e){
-  std::pair<ExprCacheMap::const_iterator, bool> success =
-                              cachedExpressions.insert({e, 1});
+  std::pair<ExprCacheSet::const_iterator, bool> success =
+                             cachedExpressions.insert(e);
+  
+  ref<Expr> res = *(success.first);
   if (success.second) {
     // Cache miss
     e->setCached(true);
+    e->setCacheKey(res);
     return e;
   }
 
   //Cache hit
-  ref<Expr> res = (*(success.first)).first;
-  cachedExpressions[res]++;
   return res;
 }
 /***/
