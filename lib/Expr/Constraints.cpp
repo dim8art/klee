@@ -72,6 +72,7 @@ public:
   Action visitExprPost(const Expr &e) override {
     auto it = replacements.find(ref<Expr>(const_cast<Expr *>(&e)));
     if (it!=replacements.end()) {
+      conflictExpressions.insert(EqExpr::create(it.first, it.second));
       return Action::changeTo(it->second);
     }
     return Action::doChildren();
@@ -79,12 +80,9 @@ public:
   ref<Expr> findConflict(const ref<Expr> &e)
   {
     ref<Expr> eSimplified = visit(e);
+    result = "Undefined";
     if (!isa<ConstantExpr>(*e))
       return eSimplified;
-    for (auto it: replacements)
-    {
-      conflictExpressions.insert(EqExpr::create(it.first, it.second));
-    }
     if(e->isTrue() == true)
       result = "True";
     if(e->isFalse() == true)
