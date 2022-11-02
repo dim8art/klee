@@ -55,11 +55,14 @@ public:
 class ExprReplaceVisitor2 : public ExprVisitor {
 private:
   const std::map< ref<Expr>, ref<Expr> > &replacements;
-
+  std::set< ref<Expr> > &conflictExpressions;
 public:
   explicit ExprReplaceVisitor2(
-      const std::map<ref<Expr>, ref<Expr>> &_replacements)
-      : ExprVisitor(true), replacements(_replacements) {}
+      const std::map<ref<Expr>, ref<Expr>> &_replacements,
+      std::set< ref<Expr> > &_conflictExpressions)
+      : ExprVisitor(true), 
+      replacements(_replacements), 
+      conflictExpressions(_conflictExpressions) {}
 
   Action visitExprPost(const Expr &e) override {
     auto it = replacements.find(ref<Expr>(const_cast<Expr *>(&e)));
@@ -68,6 +71,12 @@ public:
     }
     return Action::doChildren();
   }
+  ref<Expr> findConflict(const ref<Expr> &e)
+  {
+    ref<Expr> eSimplifed = visit(e);
+    return eSimplifed;
+  }
+
 };
 
 bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor) {
@@ -88,9 +97,14 @@ bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor) {
 
   return changed;
 }
-
 ref<Expr> ConstraintManager::simplifyExpr(const ConstraintSet &constraints,
                                           const ref<Expr> &e) {
+  std::set< ref<Expr> > cE;
+  return simplifyExpr(constraints, e, cE);
+}
+ref<Expr> ConstraintManager::simplifyExpr(const ConstraintSet &constraints,
+                                          const ref<Expr> &e,
+                                          std::set< ref<Expr> > &conflictExpressions) {
 
   if (isa<ConstantExpr>(e))
     return e;
@@ -112,7 +126,7 @@ ref<Expr> ConstraintManager::simplifyExpr(const ConstraintSet &constraints,
     }
   }
 
-  return ExprReplaceVisitor2(equalities).visit(e);
+  return ExprReplaceVisitor2(equalities, conflictExpressions).findConflict(e);
 }
 
 void ConstraintManager::addConstraintInternal(const ref<Expr> &e) {

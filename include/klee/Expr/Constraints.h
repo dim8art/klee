@@ -12,6 +12,8 @@
 
 #include "klee/Expr/Expr.h"
 
+#include <set>
+
 namespace klee {
 
 /// Resembles a set of constraints that can be passed around
@@ -58,8 +60,10 @@ public:
   /// \param expr to simplify
   /// \return simplified expression
   static ref<Expr> simplifyExpr(const ConstraintSet &constraints,
+                                const ref<Expr> &expr,
+                                std::set< ref<Expr> > &conflictExpressions);
+  static ref<Expr> simplifyExpr(const ConstraintSet &constraints,
                                 const ref<Expr> &expr);
-
   /// Add constraint to the referenced constraint set
   /// \param constraint
   void addConstraint(const ref<Expr> &constraint);
