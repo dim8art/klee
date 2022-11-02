@@ -82,7 +82,10 @@ public:
     ref<Expr> eSimplified = visit(e);
     result = "Undefined";
     if (!isa<ConstantExpr>(*e))
+    {
+      conflictExpressions.clear();
       return eSimplified;
+    }
     if(e->isTrue() == true)
       result = "True";
     if(e->isFalse() == true)
