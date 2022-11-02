@@ -81,6 +81,14 @@ public:
     ref<Expr> eSimplified = visit(e);
     if (!isa<ConstantExpr>(*e))
       return eSimplified;
+    for (auto it: replacements)
+    {
+      conflictExpressions.insert(EqExpr::create(it.first, it.second));
+    }
+    if(e->isTrue() == true)
+      result = "True";
+    if(e->isFalse() == true)
+      result = "False";
     return eSimplified;
   }
 
