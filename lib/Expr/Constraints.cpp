@@ -56,13 +56,18 @@ class ExprReplaceVisitor2 : public ExprVisitor {
 private:
   const std::map< ref<Expr>, ref<Expr> > &replacements;
   std::set< ref<Expr> > &conflictExpressions;
+  std::string &result;
 public:
   explicit ExprReplaceVisitor2(
       const std::map<ref<Expr>, ref<Expr>> &_replacements,
-      std::set< ref<Expr> > &_conflictExpressions)
+      std::set< ref<Expr> > &_conflictExpressions,
+      std::string &_result
+      )
+
       : ExprVisitor(true), 
       replacements(_replacements), 
-      conflictExpressions(_conflictExpressions) {}
+      conflictExpressions(_conflictExpressions),
+      result(_result) {}
 
   Action visitExprPost(const Expr &e) override {
     auto it = replacements.find(ref<Expr>(const_cast<Expr *>(&e)));
@@ -73,8 +78,10 @@ public:
   }
   ref<Expr> findConflict(const ref<Expr> &e)
   {
-    ref<Expr> eSimplifed = visit(e);
-    return eSimplifed;
+    ref<Expr> eSimplified = visit(e);
+    if (!isa<ConstantExpr>(*e))
+      return eSimplified;
+    return eSimplified;
   }
 
 };
@@ -97,14 +104,18 @@ bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor) {
 
   return changed;
 }
+
 ref<Expr> ConstraintManager::simplifyExpr(const ConstraintSet &constraints,
                                           const ref<Expr> &e) {
   std::set< ref<Expr> > cE;
-  return simplifyExpr(constraints, e, cE);
+  std::string r;
+  return simplifyExpr(constraints, e, cE, r);
 }
+
 ref<Expr> ConstraintManager::simplifyExpr(const ConstraintSet &constraints,
                                           const ref<Expr> &e,
-                                          std::set< ref<Expr> > &conflictExpressions) {
+                                          std::set< ref<Expr> > &conflictExpressions,
+                                          std::string &result) {
 
   if (isa<ConstantExpr>(e))
     return e;
@@ -126,7 +137,7 @@ ref<Expr> ConstraintManager::simplifyExpr(const ConstraintSet &constraints,
     }
   }
 
-  return ExprReplaceVisitor2(equalities, conflictExpressions).findConflict(e);
+  return ExprReplaceVisitor2(equalities, conflictExpressions, result).findConflict(e);
 }
 
 void ConstraintManager::addConstraintInternal(const ref<Expr> &e) {

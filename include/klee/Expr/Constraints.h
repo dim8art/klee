@@ -61,7 +61,8 @@ public:
   /// \return simplified expression
   static ref<Expr> simplifyExpr(const ConstraintSet &constraints,
                                 const ref<Expr> &expr,
-                                std::set< ref<Expr> > &conflictExpressions);
+                                std::set< ref<Expr> > &conflictExpressions,
+                                std::string &result);
   static ref<Expr> simplifyExpr(const ConstraintSet &constraints,
                                 const ref<Expr> &expr);
   /// Add constraint to the referenced constraint set
