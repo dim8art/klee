@@ -54,45 +54,42 @@ public:
 
 class ExprReplaceVisitor2 : public ExprVisitor {
 private:
-  const std::map< ref<Expr>, ref<Expr> > &replacements;
-  std::set< ref<Expr> > &conflictExpressions;
+  std::map<ref<Expr>, ref<Expr>> &replacements;
+  std::set<ref<Expr>> &conflictExpressions;
   std::string &result;
-public:
-  explicit ExprReplaceVisitor2(
-      const std::map<ref<Expr>, ref<Expr>> &_replacements,
-      std::set< ref<Expr> > &_conflictExpressions,
-      std::string &_result
-      )
 
-      : ExprVisitor(true), 
-      replacements(_replacements), 
-      conflictExpressions(_conflictExpressions),
-      result(_result) {}
+public:
+  explicit ExprReplaceVisitor2(std::map<ref<Expr>, ref<Expr>> &_replacements,
+                               std::set<ref<Expr>> &_conflictExpressions,
+                               std::string &_result)
+
+      : ExprVisitor(true), replacements(_replacements),
+        conflictExpressions(_conflictExpressions), result(_result) {}
 
   Action visitExprPost(const Expr &e) override {
     auto it = replacements.find(ref<Expr>(const_cast<Expr *>(&e)));
-    if (it!=replacements.end()) {
+    if (it != replacements.end()) {
       conflictExpressions.insert(EqExpr::create(it->first, it->second));
       return Action::changeTo(it->second);
     }
     return Action::doChildren();
   }
-  ref<Expr> findConflict(const ref<Expr> &e)
-  {
+  ref<Expr> findConflict(const ref<Expr> &e) {
     ref<Expr> eSimplified = visit(e);
     result = "Undefined";
-    if (!isa<ConstantExpr>(*e))
-    {
+
+    if (eSimplified->getWidth() != Expr::Bool ||
+        !isa<ConstantExpr>(*eSimplified)) {
       conflictExpressions.clear();
       return eSimplified;
     }
-    if(e->isTrue() == true)
+    if (eSimplified->isTrue() == true)
       result = "True";
-    if(e->isFalse() == true)
+
+    if (eSimplified->isFalse() == true)
       result = "False";
     return eSimplified;
   }
-
 };
 
 bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor) {
@@ -116,7 +113,7 @@ bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor) {
 
 ref<Expr> ConstraintManager::simplifyExpr(const ConstraintSet &constraints,
                                           const ref<Expr> &e) {
-  std::set< ref<Expr> > cE;
+  std::set<ref<Expr>> cE;
   std::string r;
   return simplifyExpr(constraints, e, cE, r);
 }
