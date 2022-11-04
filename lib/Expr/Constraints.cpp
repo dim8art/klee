@@ -153,46 +153,6 @@ ref<Expr> ConstraintManager::simplifyExpr(
     }
   }
 
-  // Test if found conflictExpressions are the set of expressions that causes
-  // the conflict
-
-  ExprReplaceVisitor2(equalities, conflictExpressions, result).findConflict(e);
-  std::map<ref<Expr>, ref<Expr>> equalitiesTest;
-  std::set<ref<Expr>> conflictExpressionsTest;
-  Expr::States resultTest;
-
-  for (auto &constraint : conflictExpressions) {
-    if (const EqExpr *ee = dyn_cast<EqExpr>(constraint))
-      equalitiesTest.insert(std::make_pair(ee->right, ee->left));
-    else
-      assert(false);
-  }
-
-  ExprReplaceVisitor2(equalitiesTest, conflictExpressionsTest, resultTest)
-      .findConflict(e);
-  //
-  if (conflictExpressions !=
-      std::set<ref<Expr>>({ConstantExpr::alloc(0, Expr::Bool)}))
-    assert(resultTest == result);
-  // Found expressions should return same result
-  //
-
-  // Test if after erasing element we would not have conflicted result
-  for (auto &constraint1 : conflictExpressions) {
-    equalitiesTest.clear();
-    conflictExpressionsTest.clear();
-    for (auto &constraint : conflictExpressions) {
-      if (constraint1 == constraint)
-        continue;
-      if (const EqExpr *ee = dyn_cast<EqExpr>(constraint))
-        equalitiesTest.insert(std::make_pair(ee->right, ee->left));
-    }
-
-    ExprReplaceVisitor2(equalitiesTest, conflictExpressionsTest, resultTest)
-        .findConflict(e);
-    assert(resultTest == Expr::States::Undefined);
-  }
-  //
   return ExprReplaceVisitor2(equalities, conflictExpressions, result)
       .findConflict(e);
 }
