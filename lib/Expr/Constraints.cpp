@@ -15,7 +15,7 @@
 
 #include "llvm/IR/Function.h"
 #include "llvm/Support/CommandLine.h"
-
+#include <fstream>
 #include <map>
 
 using namespace klee;
@@ -69,7 +69,8 @@ public:
   Action visitExprPost(const Expr &e) override {
     auto it = replacements.find(ref<Expr>(const_cast<Expr *>(&e)));
     if (it != replacements.end()) {
-      conflictExpressions.insert(EqExpr::create(it->first, it->second));
+      ref<Expr> equality = EqExpr::create(it->first, it->second);
+      conflictExpressions.insert(equality);
       return Action::changeTo(it->second);
     }
     return Action::doChildren();
@@ -78,6 +79,17 @@ public:
     ref<Expr> eSimplified = visit(e);
     result = Expr::States::Undefined;
 
+    if (conflictExpressions.find(ConstantExpr::alloc(0, Expr::Bool)) !=
+        conflictExpressions.end()) {
+      result = Expr::States::False;
+      conflictExpressions.clear();
+      conflictExpressions.insert(ConstantExpr::alloc(0, Expr::Bool));
+      return eSimplified;
+    }
+    if (conflictExpressions.find(ConstantExpr::alloc(1, Expr::Bool)) !=
+        conflictExpressions.end()) {
+      conflictExpressions.erase(ConstantExpr::alloc(1, Expr::Bool)); //
+    }
     if (eSimplified->getWidth() != Expr::Bool ||
         !isa<ConstantExpr>(*eSimplified)) {
       conflictExpressions.clear();
@@ -141,6 +153,46 @@ ref<Expr> ConstraintManager::simplifyExpr(
     }
   }
 
+  // Test if found conflictExpressions are the set of expressions that causes
+  // the conflict
+
+  ExprReplaceVisitor2(equalities, conflictExpressions, result).findConflict(e);
+  std::map<ref<Expr>, ref<Expr>> equalitiesTest;
+  std::set<ref<Expr>> conflictExpressionsTest;
+  Expr::States resultTest;
+
+  for (auto &constraint : conflictExpressions) {
+    if (const EqExpr *ee = dyn_cast<EqExpr>(constraint))
+      equalitiesTest.insert(std::make_pair(ee->right, ee->left));
+    else
+      assert(false);
+  }
+
+  ExprReplaceVisitor2(equalitiesTest, conflictExpressionsTest, resultTest)
+      .findConflict(e);
+  //
+  if (conflictExpressions !=
+      std::set<ref<Expr>>({ConstantExpr::alloc(0, Expr::Bool)}))
+    assert(resultTest == result);
+  // Found expressions should return same result
+  //
+
+  // Test if after erasing element we would not have conflicted result
+  for (auto &constraint1 : conflictExpressions) {
+    equalitiesTest.clear();
+    conflictExpressionsTest.clear();
+    for (auto &constraint : conflictExpressions) {
+      if (constraint1 == constraint)
+        continue;
+      if (const EqExpr *ee = dyn_cast<EqExpr>(constraint))
+        equalitiesTest.insert(std::make_pair(ee->right, ee->left));
+    }
+
+    ExprReplaceVisitor2(equalitiesTest, conflictExpressionsTest, resultTest)
+        .findConflict(e);
+    assert(resultTest == Expr::States::Undefined);
+  }
+  //
   return ExprReplaceVisitor2(equalities, conflictExpressions, result)
       .findConflict(e);
 }
@@ -171,8 +223,8 @@ void ConstraintManager::addConstraintInternal(const ref<Expr> &e) {
       // (byte-constant comparison).
       BinaryExpr *be = cast<BinaryExpr>(e);
       if (isa<ConstantExpr>(be->left)) {
-	ExprReplaceVisitor visitor(be->right, be->left);
-	rewriteConstraints(visitor);
+        ExprReplaceVisitor visitor(be->right, be->left);
+        rewriteConstraints(visitor);
       }
     }
     constraints.push_back(e);
