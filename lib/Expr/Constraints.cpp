@@ -15,7 +15,7 @@
 
 #include "llvm/IR/Function.h"
 #include "llvm/Support/CommandLine.h"
-#include <fstream>
+
 #include <map>
 
 using namespace klee;
@@ -88,7 +88,7 @@ public:
     }
     if (conflictExpressions.find(ConstantExpr::alloc(1, Expr::Bool)) !=
         conflictExpressions.end()) {
-      conflictExpressions.erase(ConstantExpr::alloc(1, Expr::Bool)); //
+      conflictExpressions.erase(ConstantExpr::alloc(1, Expr::Bool));
     }
     if (eSimplified->getWidth() != Expr::Bool ||
         !isa<ConstantExpr>(*eSimplified)) {
