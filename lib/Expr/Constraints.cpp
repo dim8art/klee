@@ -54,19 +54,41 @@ public:
 
 class ExprReplaceVisitor2 : public ExprVisitor {
 private:
-  const std::map< ref<Expr>, ref<Expr> > &replacements;
+  std::map<ref<Expr>, ref<Expr>> &replacements;
+  std::set<ref<Expr>> &conflictExpressions;
+  Expr::States &result;
 
 public:
-  explicit ExprReplaceVisitor2(
-      const std::map<ref<Expr>, ref<Expr>> &_replacements)
-      : ExprVisitor(true), replacements(_replacements) {}
+  explicit ExprReplaceVisitor2(std::map<ref<Expr>, ref<Expr>> &_replacements,
+                               std::set<ref<Expr>> &_conflictExpressions,
+                               Expr::States &_result)
+
+      : ExprVisitor(true), replacements(_replacements),
+        conflictExpressions(_conflictExpressions), result(_result) {}
 
   Action visitExprPost(const Expr &e) override {
     auto it = replacements.find(ref<Expr>(const_cast<Expr *>(&e)));
-    if (it!=replacements.end()) {
+    if (it != replacements.end()) {
+      ref<Expr> equality = EqExpr::create(it->first, it->second);
+      conflictExpressions.insert(equality);
       return Action::changeTo(it->second);
     }
     return Action::doChildren();
+  }
+  ref<Expr> findConflict(const ref<Expr> &e) {
+    ref<Expr> eSimplified = visit(e);
+    result = Expr::States::Undefined;
+    if (eSimplified->getWidth() != Expr::Bool ||
+        !isa<ConstantExpr>(*eSimplified)) {
+      conflictExpressions.clear();
+      return eSimplified;
+    }
+    if (eSimplified->isTrue() == true)
+      result = Expr::States::True;
+
+    if (eSimplified->isFalse() == true)
+      result = Expr::States::False;
+    return eSimplified;
   }
 };
 
@@ -91,17 +113,24 @@ bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor) {
 
 ref<Expr> ConstraintManager::simplifyExpr(const ConstraintSet &constraints,
                                           const ref<Expr> &e) {
+  std::set<ref<Expr>> cE;
+  Expr::States r;
+  return simplifyExpr(constraints, e, cE, r);
+}
+
+ref<Expr> ConstraintManager::simplifyExpr(
+    const ConstraintSet &constraints, const ref<Expr> &e,
+    std::set<ref<Expr>> &conflictExpressions, Expr::States &result) {
 
   if (isa<ConstantExpr>(e))
     return e;
 
-  std::map< ref<Expr>, ref<Expr> > equalities;
+  std::map<ref<Expr>, ref<Expr>> equalities;
 
   for (auto &constraint : constraints) {
     if (const EqExpr *ee = dyn_cast<EqExpr>(constraint)) {
       if (isa<ConstantExpr>(ee->left)) {
-        equalities.insert(std::make_pair(ee->right,
-                                         ee->left));
+        equalities.insert(std::make_pair(ee->right, ee->left));
       } else {
         equalities.insert(
             std::make_pair(constraint, ConstantExpr::alloc(1, Expr::Bool)));
@@ -111,8 +140,9 @@ ref<Expr> ConstraintManager::simplifyExpr(const ConstraintSet &constraints,
           std::make_pair(constraint, ConstantExpr::alloc(1, Expr::Bool)));
     }
   }
-
-  return ExprReplaceVisitor2(equalities).visit(e);
+  
+  return ExprReplaceVisitor2(equalities, conflictExpressions, result)
+      .findConflict(e);
 }
 
 void ConstraintManager::addConstraintInternal(const ref<Expr> &e) {
@@ -141,8 +171,8 @@ void ConstraintManager::addConstraintInternal(const ref<Expr> &e) {
       // (byte-constant comparison).
       BinaryExpr *be = cast<BinaryExpr>(e);
       if (isa<ConstantExpr>(be->left)) {
-	ExprReplaceVisitor visitor(be->right, be->left);
-	rewriteConstraints(visitor);
+        ExprReplaceVisitor visitor(be->right, be->left);
+        rewriteConstraints(visitor);
       }
     }
     constraints.push_back(e);
