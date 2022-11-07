@@ -11,6 +11,7 @@
 #define KLEE_CONSTRAINTS_H
 
 #include "klee/Expr/Expr.h"
+#include "klee/Expr/ExprHashMap.h"
 
 namespace klee {
 
@@ -57,6 +58,10 @@ public:
   /// \param constraints set of constraints used for simplification
   /// \param expr to simplify
   /// \return simplified expression
+  static ref<Expr> simplifyExpr(const ConstraintSet &constraints,
+                                const ref<Expr> &expr,
+                                ExprHashSet &conflictExpressions,
+                                Expr::States &result);
   static ref<Expr> simplifyExpr(const ConstraintSet &constraints,
                                 const ref<Expr> &expr);
 
