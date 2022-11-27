@@ -136,6 +136,16 @@ StagedSolverImpl::computeInitialValues(const Query& query,
 }
 
 bool StagedSolverImpl::check(const Query &query, ref<SolverResponse> &result) {
+  const std::vector<const Array *> objects;
+  std::vector<std::vector<unsigned char>> values;
+  bool hasSolution;
+  
+  bool primaryResult = primary->computeInitialValues(query, objects, values, hasSolution);
+  if(primaryResult && hasSolution){
+    result = new InvalidResponse(objects, values);
+    return true;
+  }
+
   return secondary->impl->check(query, result);
 }
 

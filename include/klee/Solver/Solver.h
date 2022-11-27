@@ -10,6 +10,7 @@
 #ifndef KLEE_SOLVER_H
 #define KLEE_SOLVER_H
 
+#include "klee/Expr/Assignment.h"
 #include "klee/Expr/Expr.h"
 #include "klee/System/Time.h"
 #include "klee/Solver/SolverCmdLine.h"
@@ -141,9 +142,15 @@ namespace klee {
 
     virtual bool compare(const SolverResponse &b) const = 0;
 
+    virtual bool lessThen(const SolverResponse &b) const = 0;
+
     bool operator==(const SolverResponse &b) const { return compare(b); }
 
     bool operator!=(const SolverResponse &b) const { return !compare(b); }
+
+    bool operator<(const SolverResponse &b) const { return lessThen(b); }
+
+    virtual void dump() = 0;
   };
 
   class ValidResponse : public SolverResponse {
@@ -171,35 +178,36 @@ namespace klee {
       const ValidResponse &vb = static_cast<const ValidResponse &>(b);
       return result == vb.result;
     }
+
+    bool lessThen(const SolverResponse &b) const {
+      if (b.getResponseKind() != ResponseKind::Valid)
+        return true;
+      const ValidResponse &vb = static_cast<const ValidResponse &>(b);
+      return result.constraints < vb.result.constraints;
+    }
+
+    void dump() {}
+
   };
 
   class InvalidResponse : public SolverResponse {
   private:
-    std::map<const Array *, std::vector<unsigned char>> result;
+    Assignment result;
 
   public:
     InvalidResponse(const std::vector<const Array *> &objects,
-                    const std::vector<std::vector<unsigned char>> &values) {
-      std::vector<std::vector<unsigned char>>::const_iterator values_it =
-          values.begin();
+                    std::vector<std::vector<unsigned char>> &values)
+        : result(Assignment(objects, values)) {}
 
-      for (std::vector<const Array *>::const_iterator i = objects.begin(),
-                                                      e = objects.end();
-           i != e; ++i, ++values_it) {
-        result[*i] = *values_it;
-      }
-    }
-
-    InvalidResponse(const std::map<const Array *, std::vector<unsigned char>>
-                        &initialValues)
+    InvalidResponse(Assignment::bindings_ty &initialValues)
         : result(initialValues) {}
 
     bool getInitialValuesFor(const std::vector<const Array *> &objects,
                              std::vector<std::vector<unsigned char>> &values) {
       values.reserve(objects.size());
       for (auto object : objects) {
-        if (result.count(object)) {
-          values.push_back(result.at(object));
+        if (result.bindings.count(object)) {
+          values.push_back(result.bindings.at(object));
         } else {
           return false;
         }
@@ -207,9 +215,8 @@ namespace klee {
       return true;
     }
 
-    bool getInitialValues(
-        std::map<const Array *, std::vector<unsigned char>> &values) {
-      values.insert(result.begin(), result.end());
+    bool getInitialValues(Assignment::bindings_ty &values) {
+      values.insert(result.bindings.begin(), result.bindings.end());
       return true;
     }
 
@@ -224,8 +231,23 @@ namespace klee {
       if (b.getResponseKind() != ResponseKind::Invalid)
         return false;
       const InvalidResponse &ib = static_cast<const InvalidResponse &>(b);
-      return result == ib.result;
+      return result.bindings == ib.result.bindings;
     }
+
+    bool lessThen(const SolverResponse &b) const {
+      if (b.getResponseKind() != ResponseKind::Invalid)
+        return false;
+      const InvalidResponse &ib = static_cast<const InvalidResponse &>(b);
+      return result.bindings < ib.result.bindings;
+    }
+
+    bool satisfies(std::set<ref<Expr>> &key) {
+      return result.satisfies(key.begin(), key.end());
+    }
+
+    void dump() { result.dump(); }
+
+    ref<Expr> evaluate(ref<Expr> e) { return (result.evaluate(e)); }
   };
 
   class Solver {
