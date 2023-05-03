@@ -53,9 +53,11 @@ public:
     }
   }
 
+  void add(const Assignment &b);
+
   ref<Expr> evaluate(const Array *mo, unsigned index) const;
   ref<Expr> evaluate(ref<Expr> e) const;
-  ConstraintSet createConstraintsFromAssignment() const;
+  constraints_ty createConstraintsFromAssignment() const;
 
   template <typename InputIterator>
   bool satisfies(InputIterator begin, InputIterator end);
@@ -84,6 +86,22 @@ public:
 };
 
 /***/
+
+inline void Assignment::add(const Assignment &b) {
+  for (bindings_ty::const_iterator it = b.bindings.begin();
+       it != b.bindings.end(); it++) {
+    if (bindings.find(it->first) == bindings.end()) {
+      bindings[it->first] = {};
+    }
+    SparseStorage<unsigned char>& s = bindings[it->first];
+    size_t pos = s.size();
+    s.resize(s.size()+it->second.size());
+    for (unsigned char c: it->second) {
+      s.store(pos, c);
+      pos++;
+    }
+  }
+}
 
 inline ref<Expr> Assignment::evaluate(const Array *array,
                                       unsigned index) const {

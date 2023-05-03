@@ -168,7 +168,7 @@ void AssignmentValidatingSolver::dumpAssignmentQuery(
     const Query &query, const Assignment &assignment) {
   // Create a Query that is augmented with constraints that
   // enforce the given assignment.
-  auto constraints = assignment.createConstraintsFromAssignment();
+  auto constraints = ConstraintSet(assignment.createConstraintsFromAssignment(), {}, {});
 
   // Add Constraints from `query`
   assert(!query.containsSymcretes());
