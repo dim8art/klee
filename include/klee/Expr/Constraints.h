@@ -10,15 +10,35 @@
 #ifndef KLEE_CONSTRAINTS_H
 #define KLEE_CONSTRAINTS_H
 
+#include "klee/ADT/PersistentArray.h"
 #include "klee/Expr/Assignment.h"
 #include "klee/Expr/Expr.h"
 #include "klee/Expr/ExprHashMap.h"
-
+#include "klee/Expr/IndependentSet.h"
 #include <set>
 
 namespace klee {
 
 class MemoryObject;
+
+class DSU {
+private:
+  size_t capacity = 0;
+  PersistentArray<size_t> parent;
+  PersistentArray<size_t> rank;
+
+public:
+  PersistentArray<ObjectsSet> elements;
+
+  DSU() {}
+
+  size_t find(size_t v);
+  void merge(size_t a, size_t b);
+
+  size_t size() const { return capacity; }
+
+  void addExpr(ref<Expr> e);
+};
 
 /// Resembles a set of constraints that can be passed around
 ///
@@ -61,9 +81,16 @@ public:
 
   void dump() const;
 
+  std::vector<std::vector<ObjectsSet>>
+  getAllIndependentConstraintsSets(const ref<Expr> &queryExpr) const;
+
+  std::vector<ref<Expr>>
+  getIndependentConstraints(const ref<Expr> &queryExpr) const;
+
 private:
   constraints_ty constraints;
   Assignment concretization;
+  DSU independentSets;
 };
 
 class ExprVisitor;
@@ -71,7 +98,7 @@ class ExprVisitor;
 /// Manages constraints, e.g. optimisation
 class ConstraintManager {
 public:
-  /// Create constraint manager that modifies constraints
+  /// Create constrasize_t manager that modifies constraints
   /// \param constraints
   explicit ConstraintManager(ConstraintSet &constraints);
 
@@ -86,18 +113,18 @@ public:
   static ref<Expr> simplifyExpr(const ConstraintSet &constraints,
                                 const ref<Expr> &expr);
 
-  /// Add constraint to the referenced constraint set
+  /// Add constrasize_t to the referenced constrasize_t set
   /// \param constraint
   void addConstraint(const ref<Expr> &constraint);
   void addConstraint(const ref<Expr> &constraint, const Assignment &symcretes);
 
 private:
   /// Rewrite set of constraints using the visitor
-  /// \param visitor constraint rewriter
-  /// \return true iff any constraint has been changed
+  /// \param visitor constrasize_t rewriter
+  /// \return true iff any constrasize_t has been changed
   bool rewriteConstraints(ExprVisitor &visitor);
 
-  /// Add constraint to the set of constraints
+  /// Add constrasize_t to the set of constraints
   void addConstraintInternal(const ref<Expr> &constraint);
 
   ConstraintSet &constraints;

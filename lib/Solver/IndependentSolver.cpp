@@ -55,25 +55,19 @@ public:
 
 bool IndependentSolver::computeValidity(const Query &query,
                                         Solver::Validity &result) {
-  std::vector<ref<Expr>> required;
-  IndependentElementSet eltsClosure =
-      getIndependentConstraints(query, required);
+  std::vector<ref<Expr>> required = query.getIndependentConstraints();
   ConstraintSet tmp(required);
   return solver->impl->computeValidity(query.withConstraints(tmp), result);
 }
 
 bool IndependentSolver::computeTruth(const Query &query, bool &isValid) {
-  std::vector<ref<Expr>> required;
-  IndependentElementSet eltsClosure =
-      getIndependentConstraints(query, required);
+  std::vector<ref<Expr>> required = query.getIndependentConstraints();
   ConstraintSet tmp(required);
   return solver->impl->computeTruth(query.withConstraints(tmp), isValid);
 }
 
 bool IndependentSolver::computeValue(const Query &query, ref<Expr> &result) {
-  std::vector<ref<Expr>> required;
-  IndependentElementSet eltsClosure =
-      getIndependentConstraints(query, required);
+  std::vector<ref<Expr>> required = query.getIndependentConstraints();
   ConstraintSet tmp(required);
   return solver->impl->computeValue(query.withConstraints(tmp), result);
 }
@@ -138,32 +132,36 @@ bool IndependentSolver::computeInitialValues(
   hasSolution = true;
   // FIXME: When we switch to C++11 this should be a std::unique_ptr so we don't
   // need to remember to manually call delete
-  std::list<IndependentElementSet> *factors =
-      getAllIndependentConstraintsSets(query);
+  std::vector<std::vector<ObjectsSet>> factors =
+      query.getAllIndependentConstraintsSets();
 
   // Used to rearrange all of the answers into the correct order
   std::map<const Array *, SparseStorage<unsigned char>> retMap;
-  for (std::list<IndependentElementSet>::iterator it = factors->begin();
-       it != factors->end(); ++it) {
+  for (std::vector<std::vector<ObjectsSet>>::iterator it = factors.begin();
+       it != factors.end(); ++it) {
     std::vector<const Array *> arraysInFactor;
+    std::vector<ref<Expr>> exprsInFactor;
+    ObjectsSet::elements_ty elementsInFactor;
     calculateArrayReferences(*it, arraysInFactor);
+    calculateExprReferences(*it, exprsInFactor);
+    calculateElementReferences(*it, elementsInFactor);
     // Going to use this as the "fresh" expression for the Query() invocation
     // below
-    assert(it->exprs.size() >= 1 && "No null/empty factors");
+    assert(exprsInFactor.size() >= 1 && "No null/empty factors");
     if (arraysInFactor.size() == 0) {
       continue;
     }
-    ConstraintSet tmp(it->exprs);
+    ConstraintSet tmp(exprsInFactor);
     std::vector<SparseStorage<unsigned char>> tempValues;
     if (!solver->impl->computeInitialValues(
             Query(tmp, ConstantExpr::alloc(0, Expr::Bool)), arraysInFactor,
             tempValues, hasSolution)) {
       values.clear();
-      delete factors;
+
       return false;
     } else if (!hasSolution) {
       values.clear();
-      delete factors;
+
       return true;
     } else {
       assert(tempValues.size() == arraysInFactor.size() &&
@@ -176,7 +174,7 @@ bool IndependentSolver::computeInitialValues(
           SparseStorage<unsigned char> *tempPtr = &retMap[arraysInFactor[i]];
           assert(tempPtr->size() == tempValues[i].size() &&
                  "we're talking about the same array here");
-          klee::DenseSet<unsigned> *ds = &(it->elements[arraysInFactor[i]]);
+          klee::DenseSet<unsigned> *ds = &(elementsInFactor[arraysInFactor[i]]);
           for (std::set<unsigned>::iterator it2 = ds->begin(); it2 != ds->end();
                it2++) {
             unsigned index = *it2;
@@ -210,7 +208,7 @@ bool IndependentSolver::computeInitialValues(
   }
   assert(assertCreatedPointEvaluatesToTrue(query, objects, values, retMap) &&
          "should satisfy the equation");
-  delete factors;
+
   return true;
 }
 
@@ -221,23 +219,27 @@ bool IndependentSolver::check(const Query &query, ref<SolverResponse> &result) {
 
   // FIXME: When we switch to C++11 this should be a std::unique_ptr so we don't
   // need to remember to manually call delete
-  std::list<IndependentElementSet> *factors =
-      getAllIndependentConstraintsSets(query);
+  std::vector<std::vector<ObjectsSet>> factors =
+      query.getAllIndependentConstraintsSets();
 
   // Used to rearrange all of the answers into the correct order
   std::map<const Array *, SparseStorage<unsigned char>> retMap;
-  for (std::list<IndependentElementSet>::iterator it = factors->begin();
-       it != factors->end(); ++it) {
+  for (std::vector<std::vector<ObjectsSet>>::iterator it = factors.begin();
+       it != factors.end(); ++it) {
     std::vector<const Array *> arraysInFactor;
+    std::vector<ref<Expr>> exprsInFactor;
+    ObjectsSet::elements_ty elementsInFactor;
     calculateArrayReferences(*it, arraysInFactor);
+    calculateExprReferences(*it, exprsInFactor);
+    calculateElementReferences(*it, elementsInFactor);
     // Going to use this as the "fresh" expression for the Query() invocation
     // below
-    assert(it->exprs.size() >= 1 && "No null/empty factors");
+    assert(exprsInFactor.size() >= 1 && "No null/empty factors");
     if (arraysInFactor.size() == 0) {
       continue;
     }
 
-    std::vector<ref<Expr>> factorConstraints = it->exprs;
+    std::vector<ref<Expr>> factorConstraints = exprsInFactor;
     ref<Expr> factorExpr = ConstantExpr::alloc(0, Expr::Bool);
     auto factorConstraintsExprIterator =
         std::find(factorConstraints.begin(), factorConstraints.end(),
@@ -251,10 +253,8 @@ bool IndependentSolver::check(const Query &query, ref<SolverResponse> &result) {
     std::vector<SparseStorage<unsigned char>> tempValues;
     if (!solver->impl->check(
             Query(ConstraintSet(factorConstraints), factorExpr), tempResult)) {
-      delete factors;
       return false;
     } else if (isa<ValidResponse>(tempResult)) {
-      delete factors;
       result = tempResult;
       return true;
     } else {
@@ -270,7 +270,7 @@ bool IndependentSolver::check(const Query &query, ref<SolverResponse> &result) {
           SparseStorage<unsigned char> *tempPtr = &retMap[arraysInFactor[i]];
           assert(tempPtr->size() == tempValues[i].size() &&
                  "we're talking about the same array here");
-          klee::DenseSet<unsigned> *ds = &(it->elements[arraysInFactor[i]]);
+          klee::DenseSet<unsigned> *ds = &(elementsInFactor[arraysInFactor[i]]);
           for (std::set<unsigned>::iterator it2 = ds->begin(); it2 != ds->end();
                it2++) {
             unsigned index = *it2;
@@ -288,16 +288,14 @@ bool IndependentSolver::check(const Query &query, ref<SolverResponse> &result) {
   assert(result->tryGetInitialValues(bindings));
   assert(assertCreatedPointEvaluatesToTrue(query, bindings, retMap) &&
          "should satisfy the equation");
-  delete factors;
+
   return true;
 }
 
 bool IndependentSolver::computeValidityCore(const Query &query,
                                             ValidityCore &validityCore,
                                             bool &isValid) {
-  std::vector<ref<Expr>> required;
-  IndependentElementSet eltsClosure =
-      getIndependentConstraints(query, required);
+  std::vector<ref<Expr>> required = query.getIndependentConstraints();
   ConstraintSet tmp(required);
   return solver->impl->computeValidityCore(query.withConstraints(tmp),
                                            validityCore, isValid);

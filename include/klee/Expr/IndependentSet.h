@@ -2,11 +2,11 @@
 #define KLEE_INDEPENDENTSET_H
 
 #include "klee/Expr/Expr.h"
-#include "klee/Solver/Solver.h"
 #include "llvm/Support/raw_ostream.h"
-#include <list>
+#include <map>
 #include <set>
-
+#include <string>
+#include <vector>
 namespace klee {
 
 template <class T> class DenseSet {
@@ -69,54 +69,43 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-class IndependentElementSet {
+class ObjectsSet {
 public:
   typedef std::map<const Array *, DenseSet<unsigned>> elements_ty;
   elements_ty
-      elements; // Represents individual elements of array accesses (arr[1])
+      elements;     // Represents individual elements of array accesses (arr[1])
   std::set<const Array *>
       wholeObjects; // Represents symbolically accessed arrays (arr[x])
-  std::vector<ref<Expr>> exprs; // All expressions that are associated with this
-                                // factor Although order doesn't matter, we use
-                                // a vector to match the ConstraintManager
-                                // constructor that will eventually be invoked.
+  ref<Expr> expr;   // Expression that is associated with this set
+  ObjectsSet();
+  ObjectsSet(ref<Expr> e);
+  ObjectsSet(const ObjectsSet &ies);
 
-  IndependentElementSet();
-  IndependentElementSet(ref<Expr> e);
-  IndependentElementSet(const IndependentElementSet &ies);
-
-  IndependentElementSet &operator=(const IndependentElementSet &ies);
+  ObjectsSet &operator=(const ObjectsSet &ies);
 
   void print(llvm::raw_ostream &os) const;
 
   // more efficient when this is the smaller set
-  bool intersects(const IndependentElementSet &b);
-
-  // returns true iff set is changed by addition
-  bool add(const IndependentElementSet &b);
+  bool intersects(const ObjectsSet &b);
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                                     const IndependentElementSet &ies) {
+                                     const ObjectsSet &ies) {
   ies.print(os);
   return os;
 }
 
-// Breaks down a constraint into all of it's individual pieces, returning a
-// list of IndependentElementSets or the independent factors.
-//
-// Caller takes ownership of returned std::list.
-std::list<IndependentElementSet> *
-getAllIndependentConstraintsSets(const Query &query);
-
-IndependentElementSet getIndependentConstraints(const Query &query,
-                                                std::vector<ref<Expr>> &result);
-
-// Extracts which arrays are referenced from a particular independent set.
+// Extracts which arrays are referenced from a particular objects set.
 // Examines both the actual known array accesses arr[1] plus the undetermined
 // accesses arr[x].
-void calculateArrayReferences(const IndependentElementSet &ie,
+void calculateArrayReferences(const std::vector<ObjectsSet> &independentSet,
                               std::vector<const Array *> &returnVector);
+
+void calculateExprReferences(const std::vector<ObjectsSet> &independentSet,
+                             std::vector<ref<Expr>> &returnVector);
+
+void calculateElementReferences(const std::vector<ObjectsSet> &independentSet,
+                                ObjectsSet::elements_ty &returnVector);
 } // namespace klee
 
 #endif /* KLEE_INDEPENDENTSET_H */

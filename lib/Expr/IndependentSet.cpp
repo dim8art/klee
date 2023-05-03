@@ -11,10 +11,10 @@
 
 namespace klee {
 
-IndependentElementSet::IndependentElementSet() {}
+ObjectsSet::ObjectsSet() {}
 
-IndependentElementSet::IndependentElementSet(ref<Expr> e) {
-  exprs.push_back(e);
+ObjectsSet::ObjectsSet(ref<Expr> e) {
+  expr = e;
   // Track all reads in the program.  Determines whether reads are
   // concrete or symbolic.  If they are symbolic, "collapses" array
   // by adding it to wholeObjects.  Otherwise, creates a mapping of
@@ -52,19 +52,17 @@ IndependentElementSet::IndependentElementSet(ref<Expr> e) {
   }
 }
 
-IndependentElementSet::IndependentElementSet(const IndependentElementSet &ies)
-    : elements(ies.elements), wholeObjects(ies.wholeObjects), exprs(ies.exprs) {
-}
+ObjectsSet::ObjectsSet(const ObjectsSet &ies)
+    : elements(ies.elements), wholeObjects(ies.wholeObjects), expr(ies.expr) {}
 
-IndependentElementSet &
-IndependentElementSet::operator=(const IndependentElementSet &ies) {
+ObjectsSet &ObjectsSet::operator=(const ObjectsSet &ies) {
   elements = ies.elements;
   wholeObjects = ies.wholeObjects;
-  exprs = ies.exprs;
+  expr = ies.expr;
   return *this;
 }
 
-void IndependentElementSet::print(llvm::raw_ostream &os) const {
+void ObjectsSet::print(llvm::raw_ostream &os) const {
   os << "{";
   bool first = true;
   for (std::set<const Array *>::iterator it = wholeObjects.begin(),
@@ -97,7 +95,7 @@ void IndependentElementSet::print(llvm::raw_ostream &os) const {
 }
 
 // more efficient when this is the smaller set
-bool IndependentElementSet::intersects(const IndependentElementSet &b) {
+bool ObjectsSet::intersects(const ObjectsSet &b) {
   // If there are any symbolic arrays in our query that b accesses
   for (std::set<const Array *>::iterator it = wholeObjects.begin(),
                                          ie = wholeObjects.end();
@@ -123,177 +121,64 @@ bool IndependentElementSet::intersects(const IndependentElementSet &b) {
   return false;
 }
 
-// returns true iff set is changed by addition
-bool IndependentElementSet::add(const IndependentElementSet &b) {
-  for (unsigned i = 0; i < b.exprs.size(); i++) {
-    ref<Expr> expr = b.exprs[i];
-    exprs.push_back(expr);
-  }
-
-  bool modified = false;
-  for (std::set<const Array *>::const_iterator it = b.wholeObjects.begin(),
-                                               ie = b.wholeObjects.end();
-       it != ie; ++it) {
-    const Array *array = *it;
-    elements_ty::iterator it2 = elements.find(array);
-    if (it2 != elements.end()) {
-      modified = true;
-      elements.erase(it2);
-      wholeObjects.insert(array);
-    } else {
-      if (!wholeObjects.count(array)) {
-        modified = true;
-        wholeObjects.insert(array);
-      }
+void calculateArrayReferences(const std::vector<ObjectsSet> &independentSet,
+                              std::vector<const Array *> &returnVector) {
+  for (ObjectsSet ie : independentSet) {
+    std::set<const Array *> thisSeen;
+    for (ObjectsSet::elements_ty::const_iterator it = ie.elements.begin();
+         it != ie.elements.end(); it++) {
+      thisSeen.insert(it->first);
+    }
+    for (std::set<const Array *>::iterator it = ie.wholeObjects.begin();
+         it != ie.wholeObjects.end(); it++) {
+      thisSeen.insert(*it);
+    }
+    for (std::set<const Array *>::iterator it = thisSeen.begin();
+         it != thisSeen.end(); it++) {
+      returnVector.push_back(*it);
     }
   }
-  for (elements_ty::const_iterator it = b.elements.begin(),
-                                   ie = b.elements.end();
-       it != ie; ++it) {
-    const Array *array = it->first;
-    if (!wholeObjects.count(array)) {
-      elements_ty::iterator it2 = elements.find(array);
-      if (it2 == elements.end()) {
-        modified = true;
-        elements.insert(*it);
-      } else {
-        // Now need to see if there are any (z=?)'s
-        if (it2->second.add(it->second))
-          modified = true;
-      }
-    }
-  }
-  return modified;
 }
 
-// Breaks down a constraint into all of it's individual pieces, returning a
-// list of IndependentElementSets or the independent factors.
-//
-// Caller takes ownership of returned std::list.
-std::list<IndependentElementSet> *
-getAllIndependentConstraintsSets(const Query &query) {
-  std::list<IndependentElementSet> *factors =
-      new std::list<IndependentElementSet>();
-  ConstantExpr *CE = dyn_cast<ConstantExpr>(query.expr);
-  if (CE) {
-    assert(CE && CE->isFalse() &&
-           "the expr should always be false and "
-           "therefore not included in factors");
-  } else {
-    ref<Expr> neg = Expr::createIsZero(query.expr);
-    factors->push_back(IndependentElementSet(neg));
+void calculateExprReferences(const std::vector<ObjectsSet> &independentSet,
+                             std::vector<ref<Expr>> &returnVector) {
+  for (ObjectsSet ie : independentSet) {
+    returnVector.push_back(ie.expr);
   }
+}
 
-  for (const auto &constraint : query.constraints) {
-    // iterate through all the previously separated constraints.  Until we
-    // actually return, factors is treated as a queue of expressions to be
-    // evaluated.  If the queue property isn't maintained, then the exprs
-    // could be returned in an order different from how they came it, negatively
-    // affecting later stages.
-    factors->push_back(IndependentElementSet(constraint));
-  }
-
-  bool doneLoop = false;
-  do {
-    doneLoop = true;
-    std::list<IndependentElementSet> *done =
-        new std::list<IndependentElementSet>;
-    while (factors->size() > 0) {
-      IndependentElementSet current = factors->front();
-      factors->pop_front();
-      // This list represents the set of factors that are separate from current.
-      // Those that are not inserted into this list (queue) intersect with
-      // current.
-      std::list<IndependentElementSet> *keep =
-          new std::list<IndependentElementSet>;
-      while (factors->size() > 0) {
-        IndependentElementSet compare = factors->front();
-        factors->pop_front();
-        if (current.intersects(compare)) {
-          if (current.add(compare)) {
-            // Means that we have added (z=y)added to (x=y)
-            // Now need to see if there are any (z=?)'s
-            doneLoop = false;
-          }
-        } else {
-          keep->push_back(compare);
+void calculateElementReferences(const std::vector<ObjectsSet> &independentSet,
+                                ObjectsSet::elements_ty &returnVector) {
+  std::set<const Array *> wholeObjects;
+  ObjectsSet::elements_ty elements;
+  for (ObjectsSet ie : independentSet) {
+    for (std::set<const Array *>::const_iterator it = ie.wholeObjects.begin();
+         it != ie.wholeObjects.end(); it++) {
+      const Array *array = *it;
+      ObjectsSet::elements_ty::iterator it2 = elements.find(array);
+      if (it2 != elements.end()) {
+        elements.erase(it2);
+        wholeObjects.insert(array);
+      } else {
+        if (!wholeObjects.count(array)) {
+          wholeObjects.insert(array);
         }
       }
-      done->push_back(current);
-      delete factors;
-      factors = keep;
     }
-    delete factors;
-    factors = done;
-  } while (!doneLoop);
-
-  return factors;
-}
-
-IndependentElementSet
-getIndependentConstraints(const Query &query, std::vector<ref<Expr>> &result) {
-  IndependentElementSet eltsClosure(query.expr);
-  std::vector<std::pair<ref<Expr>, IndependentElementSet>> worklist;
-
-  for (const auto &constraint : query.constraints)
-    worklist.push_back(
-        std::make_pair(constraint, IndependentElementSet(constraint)));
-
-  // XXX This should be more efficient (in terms of low level copy stuff).
-  bool done = false;
-  do {
-    done = true;
-    std::vector<std::pair<ref<Expr>, IndependentElementSet>> newWorklist;
-    for (std::vector<std::pair<ref<Expr>, IndependentElementSet>>::iterator
-             it = worklist.begin(),
-             ie = worklist.end();
-         it != ie; ++it) {
-      if (it->second.intersects(eltsClosure)) {
-        if (eltsClosure.add(it->second))
-          done = false;
-        result.push_back(it->first);
-        // Means that we have added (z=y)added to (x=y)
-        // Now need to see if there are any (z=?)'s
-      } else {
-        newWorklist.push_back(*it);
+    for (ObjectsSet::elements_ty::const_iterator it = ie.elements.begin();
+         it != ie.elements.end(); it++) {
+      const Array *array = it->first;
+      if (!wholeObjects.count(array)) {
+        ObjectsSet::elements_ty::iterator it2 = elements.find(array);
+        if (it2 == elements.end()) {
+          elements.insert(*it);
+        } else {
+          it2->second.add(it->second);
+        }
       }
     }
-    worklist.swap(newWorklist);
-  } while (!done);
-
-  // KLEE_DEBUG(
-  //     std::set<ref<Expr>> reqset(result.begin(), result.end());
-  //     errs() << "--\n"; errs() << "Q: " << query.expr << "\n";
-  //     errs() << "\telts: " << IndependentElementSet(query.expr) << "\n";
-  //     int i = 0; for (const auto &constraint
-  //                     : query.constraints) {
-  //       errs() << "C" << i++ << ": " << constraint;
-  //       errs() << " "
-  //              << (reqset.count(constraint) ? "(required)" : "(independent)")
-  //              << "\n";
-  //       errs() << "\telts: " << IndependentElementSet(constraint) << "\n";
-  //     } errs() << "elts closure: "
-  //              << eltsClosure << "\n";);
-
-  return eltsClosure;
-}
-
-void calculateArrayReferences(const IndependentElementSet &ie,
-                              std::vector<const Array *> &returnVector) {
-  std::set<const Array *> thisSeen;
-  for (std::map<const Array *, DenseSet<unsigned>>::const_iterator it =
-           ie.elements.begin();
-       it != ie.elements.end(); it++) {
-    thisSeen.insert(it->first);
   }
-  for (std::set<const Array *>::iterator it = ie.wholeObjects.begin();
-       it != ie.wholeObjects.end(); it++) {
-    thisSeen.insert(*it);
-  }
-  for (std::set<const Array *>::iterator it = thisSeen.begin();
-       it != thisSeen.end(); it++) {
-    returnVector.push_back(*it);
-  }
+  returnVector = elements;
 }
 
 } // namespace klee

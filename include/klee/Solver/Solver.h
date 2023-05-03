@@ -11,12 +11,12 @@
 #define KLEE_SOLVER_H
 
 #include "klee/ADT/SparseStorage.h"
+#include "klee/Expr/Constraints.h"
 #include "klee/Expr/Expr.h"
 #include "klee/Expr/ExprHashMap.h"
 #include "klee/Solver/ConcretizationManager.h"
 #include "klee/Solver/SolverCmdLine.h"
 #include "klee/System/Time.h"
-
 #include <vector>
 
 namespace klee {
@@ -61,6 +61,15 @@ public:
   /// Get all arrays that figure in the query
   std::vector<const Array *> gatherArrays() const;
   std::vector<const Array *> gatherSymcreteArrays() const;
+
+  std::vector<std::vector<ObjectsSet>>
+  getAllIndependentConstraintsSets() const {
+    return constraints.getAllIndependentConstraintsSets(expr);
+  }
+
+  std::vector<ref<Expr>> getIndependentConstraints() const {
+    return constraints.getIndependentConstraints(expr);
+  }
 
   bool containsSymcretes() const;
 

@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main, utbot-main]
+    branches: [IndependentSolverRework, main, utbot-main]
   push:
-    branches: [main, utbot-main]
+    branches: [IndependentSolverRework, main, utbot-main]
 
 # Defaults for building KLEE
 env:
