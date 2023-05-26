@@ -10,34 +10,36 @@
 #ifndef KLEE_CONSTRAINTS_H
 #define KLEE_CONSTRAINTS_H
 
+#include "klee/ADT/DisjointSetUnion.h"
 #include "klee/ADT/PersistentArray.h"
 #include "klee/Expr/Assignment.h"
 #include "klee/Expr/Expr.h"
 #include "klee/Expr/ExprHashMap.h"
 #include "klee/Expr/IndependentSet.h"
+
 #include <set>
 
 namespace klee {
 
 class MemoryObject;
 
-class DSU {
-private:
-  size_t capacity = 0;
-  PersistentArray<size_t> parent;
-  PersistentArray<size_t> rank;
-
+class IndependentConstraintSetUnion
+    : public DisjointSetUnion<ref<Expr>, IndependentConstraintSet> {
 public:
-  PersistentArray<ObjectsSet> elements;
+  using DisjointSetUnion<ref<Expr>, IndependentConstraintSet>::DisjointSetUnion;
+  void getIndependentConstraints(const ref<Expr> &e,
+                                 std::vector<ref<Expr>> &result) const {
+    ref<IndependentConstraintSet> compare = new IndependentConstraintSet(e);
 
-  DSU() {}
-
-  size_t find(size_t v);
-  void merge(size_t a, size_t b);
-
-  size_t size() const { return capacity; }
-
-  void addExpr(ref<Expr> e);
+    for (size_t i = 0; i < capacity; i++) {
+      size_t a = constFind(i);
+      if (IndependentConstraintSet::intersects(disjointSets[a], compare)) {
+        for (ref<Expr> expr : disjointSets[a]->exprs) {
+          result.push_back(expr);
+        }
+      }
+    }
+  }
 };
 
 /// Resembles a set of constraints that can be passed around
@@ -81,16 +83,16 @@ public:
 
   void dump() const;
 
-  std::vector<std::vector<ObjectsSet>>
-  getAllIndependentConstraintsSets(const ref<Expr> &queryExpr) const;
+  void getAllIndependentConstraintsSets(
+      const ref<Expr> &queryExpr,
+      std::vector<ref<IndependentConstraintSet>> &result) const;
 
-  std::vector<ref<Expr>>
-  getIndependentConstraints(const ref<Expr> &queryExpr) const;
+  void getIndependentConstraints(const ref<Expr> &queryExpr,
+                                 std::vector<ref<Expr>> &result) const;
 
 private:
   constraints_ty constraints;
   Assignment concretization;
-  DSU independentSets;
 };
 
 class ExprVisitor;

@@ -62,13 +62,13 @@ public:
   std::vector<const Array *> gatherArrays() const;
   std::vector<const Array *> gatherSymcreteArrays() const;
 
-  std::vector<std::vector<ObjectsSet>>
-  getAllIndependentConstraintsSets() const {
-    return constraints.getAllIndependentConstraintsSets(expr);
+  void getAllIndependentConstraintsSets(
+      std::vector<ref<IndependentConstraintSet>> &result) const {
+    constraints.getAllIndependentConstraintsSets(expr, result);
   }
 
-  std::vector<ref<Expr>> getIndependentConstraints() const {
-    return constraints.getIndependentConstraints(expr);
+  void getIndependentConstraints(std::vector<ref<Expr>> &result) const {
+    constraints.getIndependentConstraints(expr, result);
   }
 
   bool containsSymcretes() const;

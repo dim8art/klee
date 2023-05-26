@@ -17,9 +17,9 @@ template <typename ValueType> class PersistentArray {
 public:
   struct Modification {
     ValueType value;
-    OrderMaintenanaceTree::Iterator listPosition;
-    Modification(ValueType v, OrderMaintenanaceTree::Iterator lp =
-                                  OrderMaintenanaceTree::Iterator())
+    OrderMaintenanaceTrie::Iterator listPosition;
+    Modification(ValueType v, OrderMaintenanaceTrie::Iterator lp =
+                                  OrderMaintenanaceTrie::Iterator())
         : value(v), listPosition(lp) {}
   };
 
@@ -45,7 +45,7 @@ public:
 
 private:
   std::shared_ptr<VersionList> versionList;
-  std::shared_ptr<OrderMaintenanaceTree> versionListOrder;
+  std::shared_ptr<OrderMaintenanaceTrie> versionListOrder;
   std::shared_ptr<std::vector<SublistSet>> sublists;
   typename VersionList::const_iterator version;
 
@@ -62,7 +62,7 @@ public:
   PersistentArray<ValueType>() {
     versionList = std::shared_ptr<VersionList>(new VersionList);
     versionListOrder =
-        std::shared_ptr<OrderMaintenanaceTree>(new OrderMaintenanaceTree);
+        std::shared_ptr<OrderMaintenanaceTrie>(new OrderMaintenanaceTrie);
     sublists =
         std::shared_ptr<std::vector<SublistSet>>(new std::vector<SublistSet>());
     versionList->push_front(
