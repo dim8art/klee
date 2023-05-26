@@ -69,28 +69,37 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-class ObjectsSet {
+class IndependentConstraintSet {
 public:
+  // All containers need to become persistent to make fast copy and faster merge
+  // possible
   typedef std::map<const Array *, DenseSet<unsigned>> elements_ty;
   elements_ty
       elements;     // Represents individual elements of array accesses (arr[1])
   std::set<const Array *>
       wholeObjects; // Represents symbolically accessed arrays (arr[x])
-  ref<Expr> expr;   // Expression that is associated with this set
-  ObjectsSet();
-  ObjectsSet(ref<Expr> e);
-  ObjectsSet(const ObjectsSet &ies);
+  std::vector<ref<Expr>> exprs; // Expression that is associated with this set
 
-  ObjectsSet &operator=(const ObjectsSet &ies);
+  IndependentConstraintSet();
+  IndependentConstraintSet(ref<Expr> e);
+  IndependentConstraintSet(const ref<IndependentConstraintSet> &ies);
+
+  IndependentConstraintSet &operator=(const IndependentConstraintSet &ies);
 
   void print(llvm::raw_ostream &os) const;
 
   // more efficient when this is the smaller set
-  bool intersects(const ObjectsSet &b);
+  static bool intersects(ref<IndependentConstraintSet> a,
+                         ref<IndependentConstraintSet> b);
+
+  static ref<IndependentConstraintSet> merge(ref<IndependentConstraintSet> a,
+                                             ref<IndependentConstraintSet> b);
+
+  class ReferenceCounter _refCount;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                                     const ObjectsSet &ies) {
+                                     const IndependentConstraintSet &ies) {
   ies.print(os);
   return os;
 }
@@ -98,14 +107,8 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 // Extracts which arrays are referenced from a particular objects set.
 // Examines both the actual known array accesses arr[1] plus the undetermined
 // accesses arr[x].
-void calculateArrayReferences(const std::vector<ObjectsSet> &independentSet,
+void calculateArrayReferences(const ref<IndependentConstraintSet> ie,
                               std::vector<const Array *> &returnVector);
-
-void calculateExprReferences(const std::vector<ObjectsSet> &independentSet,
-                             std::vector<ref<Expr>> &returnVector);
-
-void calculateElementReferences(const std::vector<ObjectsSet> &independentSet,
-                                ObjectsSet::elements_ty &returnVector);
 } // namespace klee
 
 #endif /* KLEE_INDEPENDENTSET_H */

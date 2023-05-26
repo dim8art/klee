@@ -55,19 +55,22 @@ public:
 
 bool IndependentSolver::computeValidity(const Query &query,
                                         Solver::Validity &result) {
-  std::vector<ref<Expr>> required = query.getIndependentConstraints();
+  std::vector<ref<Expr>> required;
+  query.getIndependentConstraints(required);
   ConstraintSet tmp(required);
   return solver->impl->computeValidity(query.withConstraints(tmp), result);
 }
 
 bool IndependentSolver::computeTruth(const Query &query, bool &isValid) {
-  std::vector<ref<Expr>> required = query.getIndependentConstraints();
+  std::vector<ref<Expr>> required;
+  query.getIndependentConstraints(required);
   ConstraintSet tmp(required);
   return solver->impl->computeTruth(query.withConstraints(tmp), isValid);
 }
 
 bool IndependentSolver::computeValue(const Query &query, ref<Expr> &result) {
-  std::vector<ref<Expr>> required = query.getIndependentConstraints();
+  std::vector<ref<Expr>> required;
+  query.getIndependentConstraints(required);
   ConstraintSet tmp(required);
   return solver->impl->computeValue(query.withConstraints(tmp), result);
 }
@@ -132,26 +135,21 @@ bool IndependentSolver::computeInitialValues(
   hasSolution = true;
   // FIXME: When we switch to C++11 this should be a std::unique_ptr so we don't
   // need to remember to manually call delete
-  std::vector<std::vector<ObjectsSet>> factors =
-      query.getAllIndependentConstraintsSets();
+  std::vector<ref<IndependentConstraintSet>> factors;
+  query.getAllIndependentConstraintsSets(factors);
 
   // Used to rearrange all of the answers into the correct order
   std::map<const Array *, SparseStorage<unsigned char>> retMap;
-  for (std::vector<std::vector<ObjectsSet>>::iterator it = factors.begin();
-       it != factors.end(); ++it) {
+  for (ref<IndependentConstraintSet> it : factors) {
     std::vector<const Array *> arraysInFactor;
-    std::vector<ref<Expr>> exprsInFactor;
-    ObjectsSet::elements_ty elementsInFactor;
-    calculateArrayReferences(*it, arraysInFactor);
-    calculateExprReferences(*it, exprsInFactor);
-    calculateElementReferences(*it, elementsInFactor);
+    calculateArrayReferences(it, arraysInFactor);
     // Going to use this as the "fresh" expression for the Query() invocation
     // below
-    assert(exprsInFactor.size() >= 1 && "No null/empty factors");
+    assert(it->exprs.size() >= 1 && "No null/empty factors");
     if (arraysInFactor.size() == 0) {
       continue;
     }
-    ConstraintSet tmp(exprsInFactor);
+    ConstraintSet tmp(it->exprs);
     std::vector<SparseStorage<unsigned char>> tempValues;
     if (!solver->impl->computeInitialValues(
             Query(tmp, ConstantExpr::alloc(0, Expr::Bool)), arraysInFactor,
@@ -174,7 +172,7 @@ bool IndependentSolver::computeInitialValues(
           SparseStorage<unsigned char> *tempPtr = &retMap[arraysInFactor[i]];
           assert(tempPtr->size() == tempValues[i].size() &&
                  "we're talking about the same array here");
-          klee::DenseSet<unsigned> *ds = &(elementsInFactor[arraysInFactor[i]]);
+          klee::DenseSet<unsigned> *ds = &(it->elements[arraysInFactor[i]]);
           for (std::set<unsigned>::iterator it2 = ds->begin(); it2 != ds->end();
                it2++) {
             unsigned index = *it2;
@@ -219,27 +217,22 @@ bool IndependentSolver::check(const Query &query, ref<SolverResponse> &result) {
 
   // FIXME: When we switch to C++11 this should be a std::unique_ptr so we don't
   // need to remember to manually call delete
-  std::vector<std::vector<ObjectsSet>> factors =
-      query.getAllIndependentConstraintsSets();
+  std::vector<ref<IndependentConstraintSet>> factors;
+  query.getAllIndependentConstraintsSets(factors);
 
   // Used to rearrange all of the answers into the correct order
   std::map<const Array *, SparseStorage<unsigned char>> retMap;
-  for (std::vector<std::vector<ObjectsSet>>::iterator it = factors.begin();
-       it != factors.end(); ++it) {
+  for (ref<IndependentConstraintSet> it : factors) {
     std::vector<const Array *> arraysInFactor;
-    std::vector<ref<Expr>> exprsInFactor;
-    ObjectsSet::elements_ty elementsInFactor;
-    calculateArrayReferences(*it, arraysInFactor);
-    calculateExprReferences(*it, exprsInFactor);
-    calculateElementReferences(*it, elementsInFactor);
+    calculateArrayReferences(it, arraysInFactor);
     // Going to use this as the "fresh" expression for the Query() invocation
     // below
-    assert(exprsInFactor.size() >= 1 && "No null/empty factors");
+    assert(it->exprs.size() >= 1 && "No null/empty factors");
     if (arraysInFactor.size() == 0) {
       continue;
     }
 
-    std::vector<ref<Expr>> factorConstraints = exprsInFactor;
+    std::vector<ref<Expr>> factorConstraints = it->exprs;
     ref<Expr> factorExpr = ConstantExpr::alloc(0, Expr::Bool);
     auto factorConstraintsExprIterator =
         std::find(factorConstraints.begin(), factorConstraints.end(),
@@ -270,7 +263,7 @@ bool IndependentSolver::check(const Query &query, ref<SolverResponse> &result) {
           SparseStorage<unsigned char> *tempPtr = &retMap[arraysInFactor[i]];
           assert(tempPtr->size() == tempValues[i].size() &&
                  "we're talking about the same array here");
-          klee::DenseSet<unsigned> *ds = &(elementsInFactor[arraysInFactor[i]]);
+          klee::DenseSet<unsigned> *ds = &(it->elements[arraysInFactor[i]]);
           for (std::set<unsigned>::iterator it2 = ds->begin(); it2 != ds->end();
                it2++) {
             unsigned index = *it2;
@@ -295,7 +288,8 @@ bool IndependentSolver::check(const Query &query, ref<SolverResponse> &result) {
 bool IndependentSolver::computeValidityCore(const Query &query,
                                             ValidityCore &validityCore,
                                             bool &isValid) {
-  std::vector<ref<Expr>> required = query.getIndependentConstraints();
+  std::vector<ref<Expr>> required;
+  query.getIndependentConstraints(required);
   ConstraintSet tmp(required);
   return solver->impl->computeValidityCore(query.withConstraints(tmp),
                                            validityCore, isValid);

@@ -217,68 +217,20 @@ klee::ConstraintSet::constraint_iterator ConstraintSet::end() const {
   return constraints.end();
 }
 
-size_t DSU::find(size_t v) {
-  assert(v < capacity);
-  if (v == parent[v])
-    return v;
-  parent = parent.store(v, find(parent[v]));
-  return parent[v];
-}
-
-void DSU::merge(size_t a, size_t b) {
-  a = find(a);
-  b = find(b);
-  if (a != b) {
-    if (rank[a] < rank[b]) {
-      size_t c = a;
-      a = b;
-      b = c;
-    }
-    parent = parent.store(b, a);
-    if (rank[a] == rank[b])
-      rank = rank.store(a, rank[a] + 1);
-  }
-}
-
-void DSU::addExpr(ref<Expr> e) {
-  ObjectsSet newElement(e);
-
-  elements = elements.push_back(newElement);
-  rank = rank.push_back(0);
-  parent = parent.push_back(capacity);
-  capacity++;
-
-  for (size_t i = 0; i < capacity - 1; i++) {
-    if (elements[i].intersects(newElement)) {
-      merge(i, capacity - 1);
-    }
-  }
-}
 size_t ConstraintSet::size() const noexcept { return constraints.size(); }
 
 ConstraintSet::ConstraintSet(constraints_ty cs)
-    : constraints(std::move(cs)), concretization(Assignment(true)),
-      independentSets() {
-  for (ref<Expr> i : constraints) {
-    independentSets.addExpr(i);
-  }
-}
+    : constraints(std::move(cs)), concretization(Assignment(true)) {}
 
 ConstraintSet::ConstraintSet(ExprHashSet cs)
-    : constraints(), concretization(Assignment(true)), independentSets() {
+    : constraints(), concretization(Assignment(true)) {
   constraints.insert(constraints.end(), cs.begin(), cs.end());
-  for (ref<Expr> i : constraints) {
-    independentSets.addExpr(i);
-  }
 }
 
 ConstraintSet::ConstraintSet()
     : constraints(), concretization(Assignment(true)) {}
 
-void ConstraintSet::push_back(const ref<Expr> &e) {
-  constraints.push_back(e);
-  independentSets.addExpr(e);
-}
+void ConstraintSet::push_back(const ref<Expr> &e) { constraints.push_back(e); }
 
 void ConstraintSet::updateConcretization(const Assignment &c) {
   concretization = c;
@@ -307,11 +259,10 @@ void ConstraintSet::dump() const {
   llvm::errs() << "]\n";
 }
 
-std::vector<std::vector<ObjectsSet>>
-ConstraintSet::getAllIndependentConstraintsSets(
-    const ref<Expr> &queryExpr) const {
-  std::map<size_t, std::vector<ObjectsSet>> independentGroups;
-  DSU u = independentSets;
+void ConstraintSet::getAllIndependentConstraintsSets(
+    const ref<Expr> &queryExpr,
+    std::vector<ref<IndependentConstraintSet>> &result) const {
+  IndependentConstraintSetUnion u(constraints);
   ConstantExpr *CE = dyn_cast<ConstantExpr>(queryExpr);
   if (CE) {
     assert(CE && CE->isFalse() &&
@@ -319,36 +270,18 @@ ConstraintSet::getAllIndependentConstraintsSets(
            "therefore not included in factors");
   } else {
     ref<Expr> neg = Expr::createIsZero(queryExpr);
-    u.addExpr(neg);
-  }
-  for (size_t i = 0; i < u.size(); i++) {
-    size_t group = u.find(i);
-    if (independentGroups.count(group) == 0)
-      independentGroups[group] = {};
-    independentGroups[group].push_back(u.elements[i]);
+    u.addValue(neg);
   }
 
-  std::vector<std::vector<ObjectsSet>> result;
-  for (auto &i : independentGroups)
-    result.push_back(i.second);
-
-  return result;
+  u.getAllIndependentSets(result);
 }
 
-std::vector<ref<Expr>>
-ConstraintSet::getIndependentConstraints(const ref<Expr> &queryExpr) const {
-  std::vector<ref<Expr>> result;
-  DSU u = independentSets;
-  u.addExpr(queryExpr);
-  size_t group = u.find(u.size() - 1);
-
-  for (size_t i = 0; i < u.size() - 1; i++) {
-    if (u.find(i) == group) {
-      result.push_back(u.elements[i].expr);
-    }
-  }
-  return result;
+void ConstraintSet::getIndependentConstraints(
+    const ref<Expr> &queryExpr, std::vector<ref<Expr>> &result) const {
+  IndependentConstraintSetUnion u(constraints);
+  u.getIndependentConstraints(queryExpr, result);
 }
+
 std::vector<const Array *> ConstraintSet::gatherArrays() const {
   std::vector<const Array *> arrays;
   findObjects(constraints.begin(), constraints.end(), arrays);

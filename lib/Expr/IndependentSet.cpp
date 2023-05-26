@@ -11,10 +11,10 @@
 
 namespace klee {
 
-ObjectsSet::ObjectsSet() {}
+IndependentConstraintSet::IndependentConstraintSet() {}
 
-ObjectsSet::ObjectsSet(ref<Expr> e) {
-  expr = e;
+IndependentConstraintSet::IndependentConstraintSet(ref<Expr> e) {
+  exprs.push_back(e);
   // Track all reads in the program.  Determines whether reads are
   // concrete or symbolic.  If they are symbolic, "collapses" array
   // by adding it to wholeObjects.  Otherwise, creates a mapping of
@@ -52,17 +52,20 @@ ObjectsSet::ObjectsSet(ref<Expr> e) {
   }
 }
 
-ObjectsSet::ObjectsSet(const ObjectsSet &ies)
-    : elements(ies.elements), wholeObjects(ies.wholeObjects), expr(ies.expr) {}
+IndependentConstraintSet::IndependentConstraintSet(
+    const ref<IndependentConstraintSet> &ics)
+    : elements(ics->elements), wholeObjects(ics->wholeObjects),
+      exprs(ics->exprs) {}
 
-ObjectsSet &ObjectsSet::operator=(const ObjectsSet &ies) {
-  elements = ies.elements;
-  wholeObjects = ies.wholeObjects;
-  expr = ies.expr;
+IndependentConstraintSet &
+IndependentConstraintSet::operator=(const IndependentConstraintSet &ics) {
+  elements = ics.elements;
+  wholeObjects = ics.wholeObjects;
+  exprs = ics.exprs;
   return *this;
 }
 
-void ObjectsSet::print(llvm::raw_ostream &os) const {
+void IndependentConstraintSet::print(llvm::raw_ostream &os) const {
   os << "{";
   bool first = true;
   for (std::set<const Array *>::iterator it = wholeObjects.begin(),
@@ -94,91 +97,97 @@ void ObjectsSet::print(llvm::raw_ostream &os) const {
   os << "}";
 }
 
-// more efficient when this is the smaller set
-bool ObjectsSet::intersects(const ObjectsSet &b) {
-  // If there are any symbolic arrays in our query that b accesses
-  for (std::set<const Array *>::iterator it = wholeObjects.begin(),
-                                         ie = wholeObjects.end();
+bool IndependentConstraintSet::intersects(ref<IndependentConstraintSet> a,
+                                          ref<IndependentConstraintSet> b) {
+  if (a->exprs.size() > b->exprs.size()) {
+    std::swap(a, b);
+  }
+  for (std::set<const Array *>::iterator it = a->wholeObjects.begin(),
+                                         ie = a->wholeObjects.end();
        it != ie; ++it) {
     const Array *array = *it;
-    if (b.wholeObjects.count(array) ||
-        b.elements.find(array) != b.elements.end())
+    if (b->wholeObjects.count(array) ||
+        b->elements.find(array) != b->elements.end())
       return true;
   }
-  for (elements_ty::iterator it = elements.begin(), ie = elements.end();
+  for (elements_ty::iterator it = a->elements.begin(), ie = a->elements.end();
        it != ie; ++it) {
     const Array *array = it->first;
     // if the array we access is symbolic in b
-    if (b.wholeObjects.count(array))
+    if (b->wholeObjects.count(array))
       return true;
-    elements_ty::const_iterator it2 = b.elements.find(array);
+    elements_ty::const_iterator it2 = b->elements.find(array);
     // if any of the elements we access are also accessed by b
-    if (it2 != b.elements.end()) {
-      if (it->second.intersects(it2->second))
+    if (it2 != b->elements.end()) {
+      if (it->second.intersects(it2->second)) {
         return true;
+      }
     }
   }
   return false;
 }
 
-void calculateArrayReferences(const std::vector<ObjectsSet> &independentSet,
-                              std::vector<const Array *> &returnVector) {
-  for (ObjectsSet ie : independentSet) {
-    std::set<const Array *> thisSeen;
-    for (ObjectsSet::elements_ty::const_iterator it = ie.elements.begin();
-         it != ie.elements.end(); it++) {
-      thisSeen.insert(it->first);
-    }
-    for (std::set<const Array *>::iterator it = ie.wholeObjects.begin();
-         it != ie.wholeObjects.end(); it++) {
-      thisSeen.insert(*it);
-    }
-    for (std::set<const Array *>::iterator it = thisSeen.begin();
-         it != thisSeen.end(); it++) {
-      returnVector.push_back(*it);
+ref<IndependentConstraintSet>
+IndependentConstraintSet::merge(ref<IndependentConstraintSet> a,
+                                ref<IndependentConstraintSet> b) {
+  // a = new IndependentConstraintSet(a);
+  // b = new IndependentConstraintSet(b);
+  // Right now we dont need do copy a and b because we always have only one
+  // instance od DSU, but we will need it after adding DSU to constraints
+  if (a->exprs.size() > b->exprs.size()) {
+    std::swap(a, b);
+  }
+  for (unsigned i = 0; i < b->exprs.size(); i++) {
+    ref<Expr> expr = b->exprs[i];
+    a->exprs.push_back(expr);
+  }
+
+  for (std::set<const Array *>::const_iterator it = b->wholeObjects.begin(),
+                                               ie = b->wholeObjects.end();
+       it != ie; ++it) {
+    const Array *array = *it;
+    elements_ty::iterator it2 = a->elements.find(array);
+    if (it2 != a->elements.end()) {
+      a->elements.erase(it2);
+      a->wholeObjects.insert(array);
+    } else {
+      if (!a->wholeObjects.count(array)) {
+        a->wholeObjects.insert(array);
+      }
     }
   }
-}
-
-void calculateExprReferences(const std::vector<ObjectsSet> &independentSet,
-                             std::vector<ref<Expr>> &returnVector) {
-  for (ObjectsSet ie : independentSet) {
-    returnVector.push_back(ie.expr);
-  }
-}
-
-void calculateElementReferences(const std::vector<ObjectsSet> &independentSet,
-                                ObjectsSet::elements_ty &returnVector) {
-  std::set<const Array *> wholeObjects;
-  ObjectsSet::elements_ty elements;
-  for (ObjectsSet ie : independentSet) {
-    for (std::set<const Array *>::const_iterator it = ie.wholeObjects.begin();
-         it != ie.wholeObjects.end(); it++) {
-      const Array *array = *it;
-      ObjectsSet::elements_ty::iterator it2 = elements.find(array);
-      if (it2 != elements.end()) {
-        elements.erase(it2);
-        wholeObjects.insert(array);
+  for (elements_ty::const_iterator it = b->elements.begin(),
+                                   ie = b->elements.end();
+       it != ie; ++it) {
+    const Array *array = it->first;
+    if (!a->wholeObjects.count(array)) {
+      elements_ty::iterator it2 = a->elements.find(array);
+      if (it2 == a->elements.end()) {
+        a->elements.insert(*it);
       } else {
-        if (!wholeObjects.count(array)) {
-          wholeObjects.insert(array);
-        }
-      }
-    }
-    for (ObjectsSet::elements_ty::const_iterator it = ie.elements.begin();
-         it != ie.elements.end(); it++) {
-      const Array *array = it->first;
-      if (!wholeObjects.count(array)) {
-        ObjectsSet::elements_ty::iterator it2 = elements.find(array);
-        if (it2 == elements.end()) {
-          elements.insert(*it);
-        } else {
-          it2->second.add(it->second);
-        }
+        it2->second.add(it->second);
       }
     }
   }
-  returnVector = elements;
+  return a;
+}
+
+void calculateArrayReferences(const ref<IndependentConstraintSet> ie,
+                              std::vector<const Array *> &returnVector) {
+  std::set<const Array *> thisSeen;
+  for (IndependentConstraintSet::elements_ty::const_iterator it =
+           ie->elements.begin();
+       it != ie->elements.end(); it++) {
+    thisSeen.insert(it->first);
+  }
+  for (std::set<const Array *>::iterator it = ie->wholeObjects.begin();
+       it != ie->wholeObjects.end(); it++) {
+    thisSeen.insert(*it);
+  }
+  for (std::set<const Array *>::iterator it = thisSeen.begin();
+       it != thisSeen.end(); it++) {
+    returnVector.push_back(*it);
+  }
 }
 
 } // namespace klee

@@ -13,7 +13,7 @@
 
 namespace klee {
 
-class OrderMaintenanaceTree {
+class OrderMaintenanaceTrie {
 private:
   struct Node {
 
@@ -182,12 +182,12 @@ public:
     using reference = size_t &;
 
   private:
-    OrderMaintenanaceTree::Node *leaf;
-    const OrderMaintenanaceTree *owner;
+    OrderMaintenanaceTrie::Node *leaf;
+    const OrderMaintenanaceTrie *owner;
 
   public:
-    Iterator(OrderMaintenanaceTree::Node *leaf = nullptr,
-             const OrderMaintenanaceTree *owner = nullptr)
+    Iterator(OrderMaintenanaceTrie::Node *leaf = nullptr,
+             const OrderMaintenanaceTrie *owner = nullptr)
         : leaf(leaf), owner(owner) {}
 
     Iterator &operator++() {
@@ -214,12 +214,12 @@ public:
   Iterator begin() { return Iterator(find(0), this); }
   Iterator end() { return Iterator(nullptr, nullptr); }
 
-  OrderMaintenanaceTree() {
+  OrderMaintenanaceTrie() {
     root = new Node();
     insert(0);
   }
 
-  ~OrderMaintenanaceTree() {
+  ~OrderMaintenanaceTrie() {
     std::vector<Node *> leafs;
     findAllLeafs(root, leafs);
     delete root;
