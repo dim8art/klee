@@ -1,6 +1,8 @@
 // REQUIRES: z3
 // RUN: %clang %s -g -emit-llvm %O0opt -c -o %t1.bc
 // RUN: rm -rf %t.klee-out
+// RUN: rm -rf %t.klee-outfailnew
+// RUN: %klee --output-dir=%t.klee-outfailnew --out-of-mem-allocs=true --solver-backend=z3 --use-query-log=all:kquery,solver:kquery --write-kqueries %t1.bc 2> %t2.log
 // RUN: %klee --output-dir=%t.klee-out --out-of-mem-allocs=true --solver-backend=z3 %t1.bc 2>&1 | FileCheck %s
 
 #include "klee/klee.h"

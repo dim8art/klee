@@ -29,8 +29,24 @@ void Assignment::dump() const {
   }
 }
 
-ConstraintSet Assignment::createConstraintsFromAssignment() const {
-  ConstraintSet result;
+void Assignment::add(const Assignment &b) {
+  for (bindings_ty::const_iterator it = b.bindings.begin();
+       it != b.bindings.end(); it++) {
+    if (bindings.find(it->first) == bindings.end()) {
+      bindings[it->first] = {};
+    }
+    SparseStorage<unsigned char> &s = bindings[it->first];
+    size_t pos = s.size();
+    s.resize(s.size() + it->second.size());
+    for (unsigned char c : it->second) {
+      s.store(pos, c);
+      pos++;
+    }
+  }
+}
+
+constraints_ty Assignment::createConstraintsFromAssignment() const {
+  constraints_ty result;
   for (const auto &binding : bindings) {
     const auto &array = binding.first;
     const auto &values = binding.second;
@@ -40,17 +56,15 @@ ConstraintSet Assignment::createConstraintsFromAssignment() const {
     uint64_t arraySize = arrayConstantSize->getZExtValue();
     if (arraySize <= 8 && array->getRange() == Expr::Int8) {
       ref<Expr> e = Expr::createTempRead(array, arraySize * array->getRange());
-      result.addConstraint(EqExpr::create(e, evaluate(e)), {});
+      result.insert(EqExpr::create(e, evaluate(e)));
     } else {
       for (unsigned arrayIndex = 0; arrayIndex < arraySize; ++arrayIndex) {
         unsigned char value = values.load(arrayIndex);
-        result.addConstraint(
-            EqExpr::create(
-                ReadExpr::create(
-                    UpdateList(array, 0),
-                    ConstantExpr::alloc(arrayIndex, array->getDomain())),
-                ConstantExpr::alloc(value, array->getRange())),
-            {});
+        result.insert(EqExpr::create(
+            ReadExpr::create(
+                UpdateList(array, 0),
+                ConstantExpr::alloc(arrayIndex, array->getDomain())),
+            ConstantExpr::alloc(value, array->getRange())));
       }
     }
   }
@@ -89,7 +103,9 @@ Assignment Assignment::part(const SymcreteOrderedSet &symcretes) const {
   Assignment ret(allowFreeValues);
   for (auto symcrete : symcretes) {
     for (auto array : symcrete->dependentArrays()) {
-      ret.bindings.insert({array, bindings.at(array)});
+      if (bindings.find(array) != bindings.end()) {
+        ret.bindings.insert({array, bindings.at(array)});
+      }
     }
   }
   return ret;

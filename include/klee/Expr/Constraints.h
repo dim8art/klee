@@ -12,10 +12,14 @@
 
 #include "klee/ADT/Ref.h"
 
+#include "klee/ADT/DisjointSetUnion.h"
+#include "klee/ADT/PersistentArray.h"
 #include "klee/Expr/Assignment.h"
 #include "klee/Expr/Expr.h"
 #include "klee/Expr/ExprHashMap.h"
 #include "klee/Expr/ExprUtil.h"
+#include "klee/Expr/IndependentConstraintSetUnion.h"
+#include "klee/Expr/IndependentSet.h"
 #include "klee/Expr/Path.h"
 #include "klee/Expr/Symcrete.h"
 
@@ -55,7 +59,8 @@ public:
     return _constraints < b._constraints ||
            (_constraints == b._constraints && _symcretes < b._symcretes);
   }
-
+  ConstraintSet getConcretizedVersion() const;
+  ConstraintSet getConcretizedVersion(const Assignment &c) const;
   void dump() const;
   void print(llvm::raw_ostream &os) const;
 
@@ -64,11 +69,21 @@ public:
   const constraints_ty &cs() const;
   const symcretes_ty &symcretes() const;
   const Assignment &concretization() const;
+  const IndependentConstraintSetUnion &independentElements() const;
+
+  void getAllIndependentConstraintsSets(
+      const ref<Expr> &queryExpr,
+      std::vector<ref<const IndependentConstraintSet>> &result) const;
+
+  ref<const IndependentConstraintSet>
+  getIndependentConstraints(const ref<Expr> &queryExpr,
+                            constraints_ty &result) const;
 
 private:
   constraints_ty _constraints;
   symcretes_ty _symcretes;
   Assignment _concretization;
+  IndependentConstraintSetUnion _independentElements;
 };
 
 class PathConstraints {

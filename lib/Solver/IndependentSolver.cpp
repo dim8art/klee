@@ -58,31 +58,31 @@ public:
 bool IndependentSolver::computeValidity(const Query &query,
                                         PartialValidity &result) {
   constraints_ty required;
-  IndependentElementSet eltsClosure =
-      getIndependentConstraints(query, required);
+  ref<const IndependentConstraintSet> eltsClosure =
+      query.getIndependentConstraints(required);
   ConstraintSet tmp(
-      required, eltsClosure.symcretes,
-      query.constraints.concretization().part(eltsClosure.symcretes));
+      required, eltsClosure->symcretes,
+      query.constraints.concretization().part(eltsClosure->symcretes));
   return solver->impl->computeValidity(query.withConstraints(tmp), result);
 }
 
 bool IndependentSolver::computeTruth(const Query &query, bool &isValid) {
   constraints_ty required;
-  IndependentElementSet eltsClosure =
-      getIndependentConstraints(query, required);
+  ref<const IndependentConstraintSet> eltsClosure =
+      query.getIndependentConstraints(required);
   ConstraintSet tmp(
-      required, eltsClosure.symcretes,
-      query.constraints.concretization().part(eltsClosure.symcretes));
+      required, eltsClosure->symcretes,
+      query.constraints.concretization().part(eltsClosure->symcretes));
   return solver->impl->computeTruth(query.withConstraints(tmp), isValid);
 }
 
 bool IndependentSolver::computeValue(const Query &query, ref<Expr> &result) {
   constraints_ty required;
-  IndependentElementSet eltsClosure =
-      getIndependentConstraints(query, required);
+  ref<const IndependentConstraintSet> eltsClosure =
+      query.getIndependentConstraints(required);
   ConstraintSet tmp(
-      required, eltsClosure.symcretes,
-      query.constraints.concretization().part(eltsClosure.symcretes));
+      required, eltsClosure->symcretes,
+      query.constraints.concretization().part(eltsClosure->symcretes));
   return solver->impl->computeValue(query.withConstraints(tmp), result);
 }
 
@@ -144,17 +144,14 @@ bool IndependentSolver::computeInitialValues(
   // This is important in case we don't have any constraints but
   // we need initial values for requested array objects.
   hasSolution = true;
-  // FIXME: When we switch to C++11 this should be a std::unique_ptr so we don't
-  // need to remember to manually call delete
-  std::list<IndependentElementSet> *factors =
-      getAllIndependentConstraintsSets(query);
+  std::vector<ref<const IndependentConstraintSet>> factors;
+  query.getAllIndependentConstraintsSets(factors);
 
   // Used to rearrange all of the answers into the correct order
-  std::map<const Array *, SparseStorage<unsigned char>> retMap;
-  for (std::list<IndependentElementSet>::iterator it = factors->begin();
-       it != factors->end(); ++it) {
+  Assignment retMap(true);
+  for (ref<const IndependentConstraintSet> it : factors) {
     std::vector<const Array *> arraysInFactor;
-    calculateArrayReferences(*it, arraysInFactor);
+    it->calculateArrayReferences(arraysInFactor);
     // Going to use this as the "fresh" expression for the Query() invocation
     // below
     assert(it->exprs.size() >= 1 && "No null/empty factors");
@@ -168,58 +165,44 @@ bool IndependentSolver::computeInitialValues(
             Query(tmp, ConstantExpr::alloc(0, Expr::Bool)), arraysInFactor,
             tempValues, hasSolution)) {
       values.clear();
-      delete factors;
+
       return false;
     } else if (!hasSolution) {
       values.clear();
-      delete factors;
+
       return true;
     } else {
       assert(tempValues.size() == arraysInFactor.size() &&
              "Should be equal number arrays and answers");
-      for (unsigned i = 0; i < tempValues.size(); i++) {
-        if (retMap.count(arraysInFactor[i])) {
-          // We already have an array with some partially correct answers,
-          // so we need to place the answers to the new query into the right
-          // spot while avoiding the undetermined values also in the array
-          SparseStorage<unsigned char> *tempPtr = &retMap[arraysInFactor[i]];
-          assert(tempPtr->size() == tempValues[i].size() &&
-                 "we're talking about the same array here");
-          klee::DenseSet<unsigned> *ds = &(it->elements[arraysInFactor[i]]);
-          for (std::set<unsigned>::iterator it2 = ds->begin(); it2 != ds->end();
-               it2++) {
-            unsigned index = *it2;
-            tempPtr->store(index, tempValues[i].load(index));
-          }
-        } else {
-          // Dump all the new values into the array
-          retMap[arraysInFactor[i]] = tempValues[i];
-        }
-      }
+      // We already have an array with some partially correct answers,
+      // so we need to place the answers to the new query into the right
+      // spot while avoiding the undetermined values also in the array
+      it->addValuesToAssignment(arraysInFactor, tempValues, retMap);
     }
   }
 
-  Assignment solutionAssignment(retMap, true);
   for (std::vector<const Array *>::const_iterator it = objects.begin();
        it != objects.end(); it++) {
     const Array *arr = *it;
-    if (!retMap.count(arr)) {
+    if (!retMap.bindings.count(arr)) {
       // this means we have an array that is somehow related to the
       // constraint, but whose values aren't actually required to
       // satisfy the query.
       ref<ConstantExpr> arrayConstantSize =
-          dyn_cast<ConstantExpr>(solutionAssignment.evaluate(arr->size));
+          dyn_cast<ConstantExpr>(retMap.evaluate(arr->size));
       assert(arrayConstantSize &&
              "Array of symbolic size had not receive value for size!");
       SparseStorage<unsigned char> ret(arrayConstantSize->getZExtValue());
       values.push_back(ret);
     } else {
-      values.push_back(retMap[arr]);
+      values.push_back(retMap.bindings[arr]);
     }
   }
-  assert(assertCreatedPointEvaluatesToTrue(query, objects, values, retMap) &&
+
+  assert(assertCreatedPointEvaluatesToTrue(query, objects, values,
+                                           retMap.bindings) &&
          "should satisfy the equation");
-  delete factors;
+
   return true;
 }
 
@@ -228,17 +211,14 @@ bool IndependentSolver::check(const Query &query, ref<SolverResponse> &result) {
   // This is important in case we don't have any constraints but
   // we need initial values for requested array objects.
 
-  // FIXME: When we switch to C++11 this should be a std::unique_ptr so we don't
-  // need to remember to manually call delete
-  std::list<IndependentElementSet> *factors =
-      getAllIndependentConstraintsSets(query);
+  std::vector<ref<const IndependentConstraintSet>> factors;
+  query.getAllIndependentConstraintsSets(factors);
 
   // Used to rearrange all of the answers into the correct order
-  std::map<const Array *, SparseStorage<unsigned char>> retMap;
-  for (std::list<IndependentElementSet>::iterator it = factors->begin();
-       it != factors->end(); ++it) {
+  Assignment retMap;
+  for (ref<const IndependentConstraintSet> it : factors) {
     std::vector<const Array *> arraysInFactor;
-    calculateArrayReferences(*it, arraysInFactor);
+    it->calculateArrayReferences(arraysInFactor);
     // Going to use this as the "fresh" expression for the Query() invocation
     // below
     assert(it->exprs.size() >= 1 && "No null/empty factors");
@@ -264,10 +244,8 @@ bool IndependentSolver::check(const Query &query, ref<SolverResponse> &result) {
                       query.constraints.concretization().part(it->symcretes)),
                   factorExpr),
             tempResult)) {
-      delete factors;
       return false;
     } else if (isa<ValidResponse>(tempResult)) {
-      delete factors;
       result = tempResult;
       return true;
     } else {
@@ -276,34 +254,20 @@ bool IndependentSolver::check(const Query &query, ref<SolverResponse> &result) {
       assert(success && "Can not get initial values (Independent solver)!");
       assert(tempValues.size() == arraysInFactor.size() &&
              "Should be equal number arrays and answers");
-      for (unsigned i = 0; i < tempValues.size(); i++) {
-        if (retMap.count(arraysInFactor[i])) {
-          // We already have an array with some partially correct answers,
-          // so we need to place the answers to the new query into the right
-          // spot while avoiding the undetermined values also in the array
-          SparseStorage<unsigned char> *tempPtr = &retMap[arraysInFactor[i]];
-          assert(tempPtr->size() == tempValues[i].size() &&
-                 "we're talking about the same array here");
-          klee::DenseSet<unsigned> *ds = &(it->elements[arraysInFactor[i]]);
-          for (std::set<unsigned>::iterator it2 = ds->begin(); it2 != ds->end();
-               it2++) {
-            unsigned index = *it2;
-            tempPtr->store(index, tempValues[i].load(index));
-          }
-        } else {
-          // Dump all the new values into the array
-          retMap[arraysInFactor[i]] = tempValues[i];
-        }
-      }
+      // We already have an array with some partially correct answers,
+      // so we need to place the answers to the new query into the right
+      // spot while avoiding the undetermined values also in the array
+      it->addValuesToAssignment(arraysInFactor, tempValues, retMap);
     }
   }
-  result = new InvalidResponse(retMap);
+  result = new InvalidResponse(retMap.bindings);
   std::map<const Array *, SparseStorage<unsigned char>> bindings;
   bool success = result->tryGetInitialValues(bindings);
   assert(success);
-  assert(assertCreatedPointEvaluatesToTrue(query, bindings, retMap) &&
+
+  assert(assertCreatedPointEvaluatesToTrue(query, bindings, retMap.bindings) &&
          "should satisfy the equation");
-  delete factors;
+
   return true;
 }
 
@@ -311,11 +275,11 @@ bool IndependentSolver::computeValidityCore(const Query &query,
                                             ValidityCore &validityCore,
                                             bool &isValid) {
   constraints_ty required;
-  IndependentElementSet eltsClosure =
-      getIndependentConstraints(query, required);
+  ref<const IndependentConstraintSet> eltsClosure =
+      query.getIndependentConstraints(required);
   ConstraintSet tmp(
-      required, eltsClosure.symcretes,
-      query.constraints.concretization().part(eltsClosure.symcretes));
+      required, eltsClosure->symcretes,
+      query.constraints.concretization().part(eltsClosure->symcretes));
   return solver->impl->computeValidityCore(query.withConstraints(tmp),
                                            validityCore, isValid);
 }
