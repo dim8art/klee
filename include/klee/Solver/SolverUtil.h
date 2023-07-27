@@ -5,6 +5,7 @@
 #include "klee/Expr/Constraints.h"
 #include "klee/Expr/Expr.h"
 #include "klee/Expr/ExprHashMap.h"
+#include "klee/Expr/IndependentSet.h"
 #include "klee/System/Time.h"
 
 namespace klee {
@@ -80,6 +81,15 @@ public:
            (lhs.constraints == rhs.constraints && lhs.expr < rhs.expr);
   }
 
+  void getAllIndependentConstraintsSets(
+      std::vector<ref<const IndependentConstraintSet>> &result) const {
+    constraints.getAllIndependentConstraintsSets(expr, result);
+  }
+
+  ref<const IndependentConstraintSet>
+  getIndependentConstraints(constraints_ty &result) const {
+    return constraints.getIndependentConstraints(expr, result);
+  }
   /// Dump query
   void dump() const;
 };

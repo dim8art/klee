@@ -53,9 +53,11 @@ public:
     }
   }
 
+  void add(const Assignment &b);
+
   ref<Expr> evaluate(const Array *mo, unsigned index) const;
   ref<Expr> evaluate(ref<Expr> e) const;
-  ConstraintSet createConstraintsFromAssignment() const;
+  constraints_ty createConstraintsFromAssignment() const;
 
   template <typename InputIterator>
   bool satisfies(InputIterator begin, InputIterator end);

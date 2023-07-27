@@ -453,8 +453,8 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
                    InterpreterHandler *ih)
     : Interpreter(opts), interpreterHandler(ih), searcher(nullptr),
       externalDispatcher(new ExternalDispatcher(ctx)), statsTracker(0),
-      pathWriter(0), symPathWriter(0),
-      specialFunctionHandler(0), timers{time::Span(TimerInterval)},
+      pathWriter(0), symPathWriter(0), specialFunctionHandler(0),
+      timers{time::Span(TimerInterval)},
       concretizationManager(new ConcretizationManager(EqualitySubstitution)),
       codeGraphDistance(new CodeGraphDistance()),
       distanceCalculator(new DistanceCalculator(*codeGraphDistance)),
@@ -5379,11 +5379,13 @@ MemoryObject *Executor::allocate(ExecutionState &state, ref<Expr> size,
       ZExtExpr::create(size, pointerWidthInBits)};
 
   constraints_ty required;
-  IndependentElementSet eltsClosure = getIndependentConstraints(
-      Query(state.constraints.cs(), ZExtExpr::create(size, pointerWidthInBits)),
-      required);
+  ref<const IndependentConstraintSet> eltsClosure =
+      Query(state.constraints.cs(), ZExtExpr::create(size, pointerWidthInBits))
+          .getIndependentConstraints(
+
+              required);
   /* Collect dependent size symcretes. */
-  for (ref<Symcrete> symcrete : eltsClosure.symcretes) {
+  for (ref<Symcrete> symcrete : eltsClosure->symcretes) {
     if (isa<SizeSymcrete>(symcrete)) {
       symbolicSizesTerms.push_back(
           ZExtExpr::create(symcrete->symcretized, pointerWidthInBits));
