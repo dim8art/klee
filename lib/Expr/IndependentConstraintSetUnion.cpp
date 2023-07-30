@@ -99,7 +99,7 @@ void IndependentConstraintSetUnion::addSymcrete(const ref<Symcrete> s) {
   disjointSets = disjointSets.insert({value, new IndependentConstraintSet(s)});
 
   internalStorage = internalStorage.insert(value);
-  std::vector<ref<Expr>> oldRoots(roots.begin(), roots.end());
+  ImmutableSet oldRoots = roots;
   for (ref<Expr> v : oldRoots) {
     if (!areJoined(v, value) &&
         IndependentConstraintSet::intersects(disjointSets.at(find(v)),

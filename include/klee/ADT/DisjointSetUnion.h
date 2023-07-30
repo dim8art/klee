@@ -24,7 +24,7 @@ protected:
     assert(parent.find(v) != parent.end());
     if (v == parent.at(v))
       return v;
-    parent = parent.replace(v, find(parent.at(v)));
+    parent = parent.replace({v, find(parent.at(v))});
     return parent.at(v);
   }
 
@@ -46,14 +46,14 @@ protected:
     if (rank.at(a) < rank.at(b)) {
       std::swap(a, b);
     }
-    parent = parent.replace(b, a);
+    parent = parent.replace({b, a});
     if (rank.at(a) == rank.at(b)) {
-      rank = rank.replace(rank.at(a), rank.at(a)+1);
+      rank = rank.replace({a, rank.at(a)+1});
     }
 
     roots = roots.remove(b);
-    disjointSets = disjointSets.replace(a, SetType::merge(disjointSets.at(a), disjointSets.at(b)));
-    disjointSets = disjointSets.replace(b, nullptr);
+    disjointSets = disjointSets.replace({a, SetType::merge(disjointSets.at(a), disjointSets.at(b))});
+    disjointSets = disjointSets.replace({b, nullptr});
   }
 
   bool areJoined(const ValueType &i, const ValueType &j) const {
@@ -87,13 +87,13 @@ public:
     if (internalStorage.find(value) != internalStorage.end()) {
       return;
     }
-    parent = parent.insert(value, value);
+    parent = parent.insert({value, value});
     roots = roots.insert(value);
-    rank = rank.insert(value, 0);
-    disjointSets = disjointSets.insert(value, new SetType(value));
+    rank = rank.insert({value, 0});
+    disjointSets = disjointSets.insert({value, new SetType(value)});
 
     internalStorage = internalStorage.insert(value);
-    std::vector<ValueType> oldRoots(roots.begin(), roots.end());
+    ImmutableSet oldRoots = roots;
     for (ValueType v : oldRoots) {
       if (!areJoined(v, value) &&
           SetType::intersects(disjointSets.at(find(v)),
@@ -108,12 +108,21 @@ public:
   }
 
   void add(const DisjointSetUnion &b) {
-    parent.insert(b.parent.begin(), b.parent.end());
-    roots.insert(b.roots.begin(), b.roots.end());
-    rank.insert(b.rank.begin(), b.rank.end());
-
-    internalStorage.insert(b.internalStorage.begin(), b.internalStorage.end());
-    disjointSets.insert(b.disjointSets.begin(), b.disjointSets.end());
+    for (auto it : b.parent) {
+      parent = parent.insert(it);
+    }
+    for (auto it : b.roots) {
+      roots = roots.insert(it);
+    }
+    for (auto it : b.rank) {
+      rank = rank.insert(it);
+    }
+    for (auto it : b.internalStorage) {
+      internalStorage = internalStorage.insert(it);
+    }
+    for (auto it : b.disjointSets) {
+      disjointSets = disjointSets.insert(it);
+    }
   }
   DisjointSetUnion() {}
 
