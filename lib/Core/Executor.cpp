@@ -5415,11 +5415,13 @@ MemoryObject *Executor::allocate(ExecutionState &state, ref<Expr> size,
       ZExtExpr::create(size, pointerWidthInBits)};
 
   constraints_ty required;
-  IndependentElementSet eltsClosure = getIndependentConstraints(
-      Query(state.constraints.cs(), ZExtExpr::create(size, pointerWidthInBits)),
-      required);
+  ref<const IndependentConstraintSet> eltsClosure =
+      Query(state.constraints.cs(), ZExtExpr::create(size, pointerWidthInBits))
+          .getIndependentConstraints(
+
+              required);
   /* Collect dependent size symcretes. */
-  for (ref<Symcrete> symcrete : eltsClosure.symcretes) {
+  for (ref<Symcrete> symcrete : eltsClosure->symcretes) {
     if (isa<SizeSymcrete>(symcrete)) {
       symbolicSizesTerms.push_back(
           ZExtExpr::create(symcrete->symcretized, pointerWidthInBits));
