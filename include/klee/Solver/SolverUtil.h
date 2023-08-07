@@ -249,7 +249,7 @@ public:
   }
 
   bool tryGetInitialValues(Assignment::bindings_ty &values) const {
-    values.insert(result.bindings.begin(), result.bindings.end());
+    values = result.bindings;
     return true;
   }
 

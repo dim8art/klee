@@ -54,7 +54,8 @@ void IndependentConstraintSetUnion::updateConcretization(
     disjointSets = disjointSets.replace({e, ics});
   }
   for (auto it : delta.bindings) {
-    concretization.bindings[it.first] = it.second;
+    concretization.bindings =
+        concretization.bindings.replace({it.first, it.second});
   }
 }
 
@@ -67,7 +68,7 @@ void IndependentConstraintSetUnion::removeConcretization(
     disjointSets = disjointSets.replace({e, ics});
   }
   for (auto it : remove.bindings) {
-    concretization.bindings.erase(it.first);
+    concretization.bindings = concretization.bindings.remove(it.first);
   }
 }
 void IndependentConstraintSetUnion::reEvaluateConcretization(
@@ -76,9 +77,10 @@ void IndependentConstraintSetUnion::reEvaluateConcretization(
   Assignment removed(true);
   for (const auto it : concretization) {
     if (newConcretization.bindings.count(it.first) == 0) {
-      removed.bindings.insert(it);
+      removed.bindings = removed.bindings.insert(it);
     } else if (newConcretization.bindings.at(it.first) != it.second) {
-      delta.bindings.insert(*(newConcretization.bindings.find(it.first)));
+      delta.bindings =
+          delta.bindings.insert(*(newConcretization.bindings.find(it.first)));
     }
   }
   updateConcretization(delta);

@@ -20,7 +20,7 @@ void Assignment::dump() const {
     llvm::errs() << "No bindings\n";
     return;
   }
-  for (bindings_ty::const_iterator i = bindings.begin(), e = bindings.end();
+  for (bindings_ty::iterator i = bindings.begin(), e = bindings.end();
        i != e; ++i) {
     llvm::errs() << (*i).first->getName() << "\n[";
     for (int j = 0, k = (*i).second.size(); j < k; ++j)
@@ -30,18 +30,19 @@ void Assignment::dump() const {
 }
 
 void Assignment::add(const Assignment &b) {
-  for (bindings_ty::const_iterator it = b.bindings.begin();
-       it != b.bindings.end(); it++) {
+  for (bindings_ty::iterator it = b.bindings.begin();
+       it != b.bindings.end(); ++it) {
     if (bindings.find(it->first) == bindings.end()) {
-      bindings[it->first] = {};
+      bindings = bindings.replace({it->first, {}});
     }
-    SparseStorage<unsigned char> &s = bindings[it->first];
+    SparseStorage<unsigned char> s = bindings.at(it->first);
     size_t pos = s.size();
     s.resize(s.size() + it->second.size());
     for (unsigned char c : it->second) {
       s.store(pos, c);
       pos++;
     }
+    bindings = bindings.replace({it->first, s});
   }
 }
 
@@ -76,7 +77,7 @@ Assignment Assignment::diffWith(const Assignment &other) const {
   Assignment diffAssignment(allowFreeValues);
   for (const auto &it : other) {
     if (bindings.count(it.first) == 0 || bindings.at(it.first) != it.second) {
-      diffAssignment.bindings.insert(it);
+      diffAssignment.bindings = diffAssignment.bindings.insert(it);
     }
   }
   return diffAssignment;
@@ -105,7 +106,7 @@ Assignment Assignment::part(const SymcreteOrderedSet &symcretes) const {
   for (auto symcrete : symcretes) {
     for (auto array : symcrete->dependentArrays()) {
       if (bindings.find(array) != bindings.end()) {
-        ret.bindings.insert({array, bindings.at(array)});
+        ret.bindings = ret.bindings.insert({array, bindings.at(array)});
       }
     }
   }

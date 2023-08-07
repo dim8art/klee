@@ -32,7 +32,8 @@ IndependentConstraintSet::updateConcretization(
     return ics;
   }
   for (auto i : delta.bindings) {
-    ics->concretization.bindings[i.first] = i.second;
+    ics->concretization.bindings =
+        ics->concretization.bindings.replace({i.first, i.second});
   }
   InnerSetUnion DSU;
   for (ref<Expr> i : exprs) {
@@ -56,7 +57,7 @@ IndependentConstraintSet::removeConcretization(
     return ics;
   }
   for (auto i : delta.bindings) {
-    ics->concretization.bindings.erase(i.first);
+    ics->concretization.bindings = ics->concretization.bindings.remove(i.first);
   }
   InnerSetUnion DSU;
   for (ref<Expr> i : exprs) {
@@ -79,7 +80,7 @@ void IndependentConstraintSet::addValuesToAssignment(
     Assignment &assign) const {
   for (unsigned i = 0; i < values.size(); i++) {
     if (assign.bindings.count(objects[i])) {
-      SparseStorage<unsigned char> &value = assign.bindings[objects[i]];
+      SparseStorage<unsigned char> value = assign.bindings.at(objects[i]);
       assert(value.size() == values[i].size() &&
              "we're talking about the same array here");
       DenseSet<unsigned> ds = (elements.find(objects[i]))->second;
@@ -88,8 +89,9 @@ void IndependentConstraintSet::addValuesToAssignment(
         unsigned index = *it2;
         value.store(index, values[i].load(index));
       }
+      assign.bindings = assign.bindings.replace({objects[i], value});
     } else {
-      assign.bindings[objects[i]] = values[i];
+      assign.bindings = assign.bindings.replace({objects[i], values[i]});
     }
   }
 }

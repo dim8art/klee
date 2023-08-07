@@ -197,7 +197,8 @@ void ConstraintSet::addConstraint(ref<Expr> e, const Assignment &delta) {
   _independentElements.addExpr(e);
   // Update bindings
   for (auto i : delta.bindings) {
-    _concretization.bindings[i.first] = i.second;
+    _concretization.bindings =
+        _concretization.bindings.replace({i.first, i.second});
   }
   _independentElements.updateConcretization(delta);
 }
@@ -210,8 +211,10 @@ void ConstraintSet::addSymcrete(ref<Symcrete> s,
   _independentElements.addSymcrete(s);
   Assignment dependentConcretization(true);
   for (auto i : s->dependentArrays()) {
-    _concretization.bindings[i] = concretization.bindings.at(i);
-    dependentConcretization.bindings[i] = concretization.bindings.at(i);
+    _concretization.bindings =
+        _concretization.bindings.replace({i, concretization.bindings.at(i)});
+    dependentConcretization.bindings = dependentConcretization.bindings.replace(
+        {i, concretization.bindings.at(i)});
   }
   _independentElements.updateConcretization(dependentConcretization);
 }
@@ -228,7 +231,7 @@ bool ConstraintSet::isSymcretized(ref<Expr> expr) const {
 void ConstraintSet::rewriteConcretization(const Assignment &a) {
   for (auto i : a.bindings) {
     if (concretization().bindings.count(i.first)) {
-      _concretization.bindings[i.first] = i.second;
+      _concretization.bindings = _concretization.bindings.replace({i.first, i.second});
     }
   }
   _independentElements.updateConcretization(a);

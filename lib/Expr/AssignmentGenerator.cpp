@@ -212,7 +212,7 @@ bool AssignmentGenerator::helperGenerateAssignment(const ref<Expr> &e,
           return false;
         }
         if (a->bindings.find(re.updates.root) == a->bindings.end()) {
-          a->bindings.insert(std::make_pair(
+          a->bindings = a->bindings.insert(std::make_pair(
               re.updates.root, SparseStorage<unsigned char>(c_value, 0)));
         } else {
           return false;

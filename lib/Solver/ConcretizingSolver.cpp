@@ -224,7 +224,7 @@ bool ConcretizingSolver::relaxSymcreteConstraints(const Query &query,
 
     if (arrayQueue.empty() && addressArrayPresent) {
       while (!addressQueue.empty()) {
-        assignment.bindings.erase(addressQueue.front());
+        assignment.bindings = assignment.bindings.remove(addressQueue.front());
         addressQueue.pop();
       }
 
@@ -241,7 +241,7 @@ bool ConcretizingSolver::relaxSymcreteConstraints(const Query &query,
 
     while (!arrayQueue.empty()) {
       const Array *brokenArray = arrayQueue.front();
-      assignment.bindings.erase(brokenArray);
+      assignment.bindings = assignment.bindings.remove(brokenArray);
       wereConcretizationsRemoved = true;
       arrayQueue.pop();
 
@@ -347,7 +347,7 @@ bool ConcretizingSolver::relaxSymcreteConstraints(const Query &query,
   }
 
   for (unsigned idx = 0; idx < objects.size(); ++idx) {
-    assignment.bindings[objects[idx]] = brokenSymcretizedValues[idx];
+    assignment.bindings = assignment.bindings.replace({objects[idx], brokenSymcretizedValues[idx]});
   }
 
   ExprHashMap<ref<Expr>> concretizations;

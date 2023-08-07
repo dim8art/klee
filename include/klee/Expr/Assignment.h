@@ -10,6 +10,7 @@
 #ifndef KLEE_ASSIGNMENT_H
 #define KLEE_ASSIGNMENT_H
 
+#include "klee/ADT/ImmutableMap.h"
 #include "klee/ADT/SparseStorage.h"
 #include "klee/Expr/ExprEvaluator.h"
 
@@ -27,7 +28,7 @@ using symcretes_ty = SymcreteOrderedSet;
 
 class Assignment {
 public:
-  typedef std::map<const Array *, SparseStorage<unsigned char>> bindings_ty;
+  using bindings_ty = ImmutableMap<const Array *, SparseStorage<unsigned char>>;
 
   bool allowFreeValues;
   bindings_ty bindings;
@@ -49,7 +50,7 @@ public:
     for (unsigned i = 0; i < values.size(); ++i) {
       const Array *os = objects.at(i);
       const SparseStorage<unsigned char> &arr = values.at(i);
-      bindings.insert(std::make_pair(os, arr));
+      bindings = bindings.insert(std::make_pair(os, arr));
     }
   }
 
@@ -66,8 +67,8 @@ public:
   Assignment diffWith(const Assignment &other) const;
   Assignment part(const SymcreteOrderedSet &symcretes) const;
 
-  bindings_ty::const_iterator begin() const { return bindings.begin(); }
-  bindings_ty::const_iterator end() const { return bindings.end(); }
+  bindings_ty::iterator begin() const { return bindings.begin(); }
+  bindings_ty::iterator end() const { return bindings.end(); }
   bool isEmpty() { return begin() == end(); }
 
   std::vector<const Array *> keys() const;
@@ -91,7 +92,7 @@ public:
 inline ref<Expr> Assignment::evaluate(const Array *array,
                                       unsigned index) const {
   assert(array);
-  bindings_ty::const_iterator it = bindings.find(array);
+  bindings_ty::iterator it = bindings.find(array);
   if (it != bindings.end() && index < it->second.size()) {
     return ConstantExpr::alloc(it->second.load(index), array->getRange());
   } else {

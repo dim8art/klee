@@ -11,6 +11,7 @@
 #define KLEE_IMMUTABLEMAP_H
 
 #include <functional>
+#include <map>
 
 #include "ImmutableTree.h"
 
@@ -42,6 +43,30 @@ public:
   ImmutableMap &operator=(const ImmutableMap &b) {
     elts = b.elts;
     return *this;
+  }
+
+  bool operator==(const ImmutableMap &b) const {
+    std::map<K, D, CMP> cmp1;
+    std::map<K, D, CMP> cmp2;
+    for(auto it: *this){
+      cmp1.insert(it);
+    }
+    for(auto it: b){
+      cmp2.insert(it);
+    }
+    return cmp1 == cmp2;
+  }
+
+  bool operator<(const ImmutableMap &b) const {
+    std::map<K, D, CMP> cmp1;
+    std::map<K, D, CMP> cmp2;
+    for(auto it: *this){
+      cmp1.insert(it);
+    }
+    for(auto it: b){
+      cmp2.insert(it);
+    }
+    return cmp1 < cmp2;
   }
 
   bool empty() const { return elts.empty(); }

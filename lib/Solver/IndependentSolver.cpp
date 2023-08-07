@@ -93,7 +93,7 @@ bool IndependentSolver::computeValue(const Query &query, ref<Expr> &result) {
 bool assertCreatedPointEvaluatesToTrue(
     const Query &query, const std::vector<const Array *> &objects,
     std::vector<SparseStorage<unsigned char>> &values,
-    std::map<const Array *, SparseStorage<unsigned char>> &retMap) {
+    Assignment::bindings_ty &retMap) {
   // _allowFreeValues is set to true so that if there are missing bytes in the
   // assignment we will end up with a non ConstantExpr after evaluating the
   // assignment and fail
@@ -103,9 +103,11 @@ bool assertCreatedPointEvaluatesToTrue(
   // The semantics of std::map should be to not insert a (key, value)
   // pair if it already exists so we should continue to use the assignment
   // from ``objects`` and ``values``.
-  if (retMap.size() > 0)
-    assign.bindings.insert(retMap.begin(), retMap.end());
-
+  if (retMap.size() > 0) {
+    for (auto it : retMap) {
+      assign.bindings = assign.bindings.insert(it);
+    }
+  }
   for (auto const &constraint : query.constraints.cs()) {
     ref<Expr> ret = assign.evaluate(constraint);
 
@@ -123,10 +125,9 @@ bool assertCreatedPointEvaluatesToTrue(
   return cast<ConstantExpr>(q)->isTrue();
 }
 
-bool assertCreatedPointEvaluatesToTrue(
-    const Query &query,
-    std::map<const Array *, SparseStorage<unsigned char>> &bindings,
-    std::map<const Array *, SparseStorage<unsigned char>> &retMap) {
+bool assertCreatedPointEvaluatesToTrue(const Query &query,
+                                       Assignment::bindings_ty &bindings,
+                                       Assignment::bindings_ty &retMap) {
   std::vector<const Array *> objects;
   std::vector<SparseStorage<unsigned char>> values;
   objects.reserve(bindings.size());
@@ -195,7 +196,7 @@ bool IndependentSolver::computeInitialValues(
       SparseStorage<unsigned char> ret(arrayConstantSize->getZExtValue());
       values.push_back(ret);
     } else {
-      values.push_back(retMap.bindings[arr]);
+      values.push_back(retMap.bindings.at(arr));
     }
   }
 
@@ -250,7 +251,7 @@ bool IndependentSolver::check(const Query &query, ref<SolverResponse> &result) {
     }
   }
   result = new InvalidResponse(retMap.bindings);
-  std::map<const Array *, SparseStorage<unsigned char>> bindings;
+  Assignment::bindings_ty bindings;
   bool success = result->tryGetInitialValues(bindings);
   assert(success);
 

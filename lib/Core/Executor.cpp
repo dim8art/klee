@@ -5468,7 +5468,7 @@ MemoryObject *Executor::allocate(ExecutionState &state, ref<Expr> size,
     state.addPointerResolution(addressExpr, mo);
   }
 
-  assignment.bindings[addressArray] = sparseBytesFromValue(mo->address);
+  assignment.bindings = assignment.bindings.replace({addressArray, sparseBytesFromValue(mo->address)});
 
   state.constraints.addSymcrete(sizeSymcrete, assignment);
   state.constraints.addSymcrete(addressSymcrete, assignment);
@@ -6425,8 +6425,8 @@ void Executor::executeMakeSymbolic(ExecutionState &state,
 
         if (!obj) {
           if (ZeroSeedExtension) {
-            si.assignment.bindings[array] =
-                SparseStorage<unsigned char>(mo->size, 0);
+            si.assignment.bindings = si.assignment.bindings.replace({
+                array, SparseStorage<unsigned char>(mo->size, 0)});
           } else if (!AllowSeedExtension) {
             terminateStateOnUserError(state,
                                       "ran out of inputs during seeding");
@@ -6446,14 +6446,18 @@ void Executor::executeMakeSymbolic(ExecutionState &state,
             terminateStateOnUserError(state, msg.str());
             break;
           } else {
-            SparseStorage<unsigned char> &values =
-                si.assignment.bindings[array];
+            SparseStorage<unsigned char> values;
+            if (si.assignment.bindings.find(array) !=
+                si.assignment.bindings.end()) {
+              values = si.assignment.bindings.at(array);
+            }
             values.resize(std::min(mo->size, obj->numBytes));
             values.store(0, obj->bytes,
                          obj->bytes + std::min(obj->numBytes, mo->size));
             if (ZeroSeedExtension) {
               values.resize(mo->size);
             }
+            si.assignment.bindings = si.assignment.bindings.replace({array, values});
           }
         }
       }
@@ -7076,7 +7080,7 @@ bool Executor::getSymbolicSolution(const ExecutionState &state, KTest &res) {
 
   Assignment model = Assignment(objects, values, true);
   for (auto binding : state.constraints.cs().concretization().bindings) {
-    model.bindings.insert(binding);
+    model.bindings = model.bindings.insert(binding);
   }
 
   setInitializationGraph(state, model, res);

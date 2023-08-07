@@ -158,7 +158,7 @@ bool ValidatingSolver::check(const Query &query, ref<SolverResponse> &result) {
     // conjunction of the actual constraints is satisfiable.
 
     ConstraintSet bindings;
-    std::map<const Array *, SparseStorage<unsigned char>> initialValues;
+    Assignment::bindings_ty initialValues;
     cast<InvalidResponse>(result)->tryGetInitialValues(initialValues);
     Assignment solutionAssignment(initialValues);
     for (auto &arrayValues : initialValues) {
