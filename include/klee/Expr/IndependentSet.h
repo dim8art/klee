@@ -94,9 +94,9 @@ public:
       elements; // Represents individual elements of array accesses (arr[1])
   ImmutableSet<const Array *>
       wholeObjects;     // Represents symbolically accessed arrays (arr[x])
-  constraints_ty exprs; // All expressions (constraints) that are associated
+  ImmutableSet<ref<Expr>> exprs; // All expressions (constraints) that are associated
                         // with this factor
-  SymcreteOrderedSet symcretes; // All symcretes associated with this factor
+  ImmutableSet<ref<Symcrete>> symcretes; // All symcretes associated with this factor
 
   Assignment concretization;
 
@@ -135,7 +135,22 @@ public:
   // Examines both the actual known array accesses arr[1] plus the undetermined
   // accesses arr[x].Z
   void calculateArrayReferences(std::vector<const Array *> &returnVector) const;
+  
+  SymcreteOrderedSet getSymcretes() const {
+    SymcreteOrderedSet a;
+    for(ref<Symcrete> s : symcretes){
+      a.insert(s);
+    }
+    return a;
+  }
 
+  constraints_ty getConstraints() const {
+    constraints_ty a;
+    for(ref<Expr> e : exprs){
+      a.insert(e);
+    }
+    return a;
+  }
   mutable class ReferenceCounter _refCount;
 };
 

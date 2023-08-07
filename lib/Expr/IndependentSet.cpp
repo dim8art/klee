@@ -101,7 +101,7 @@ IndependentConstraintSet::IndependentConstraintSet()
 
 IndependentConstraintSet::IndependentConstraintSet(ref<Expr> e)
     : concretization(Assignment(true)) {
-  exprs.insert(e);
+  exprs = exprs.insert(e);
   // Track all reads in the program.  Determines whether reads are
   // concrete or symbolic.  If they are symbolic, "collapses" array
   // by adding it to wholeObjects.  Otherwise, creates a mapping of
@@ -139,10 +139,10 @@ IndependentConstraintSet::IndependentConstraintSet(ref<Expr> e)
 
 IndependentConstraintSet::IndependentConstraintSet(ref<Symcrete> s)
     : concretization(Assignment(true)) {
-  symcretes.insert(s);
+  symcretes = symcretes.insert(s);
 
   for (Symcrete &dependentSymcrete : s->dependentSymcretes()) {
-    symcretes.insert(ref<Symcrete>(&dependentSymcrete));
+    symcretes = symcretes.insert(ref<Symcrete>(&dependentSymcrete));
   }
 
   // Track all reads in the program.  Determines whether reads are
@@ -291,10 +291,10 @@ IndependentConstraintSet::merge(ref<const IndependentConstraintSet> A,
     std::swap(a, b);
   }
   for (ref<Expr> expr : b->exprs) {
-    a->exprs.insert(expr);
+    a->exprs = a->exprs.insert(expr);
   }
   for (const ref<Symcrete> &symcrete : b->symcretes) {
-    a->symcretes.insert(symcrete);
+    a->symcretes = a->symcretes.insert(symcrete);
   }
 
   for (ImmutableSet<const Array *>::iterator it = b->wholeObjects.begin(),

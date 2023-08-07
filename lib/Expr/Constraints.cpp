@@ -185,8 +185,8 @@ ConstraintSet::ConstraintSet(constraints_ty cs, symcretes_ty symcretes,
       _independentElements(_constraints, _symcretes, _concretization) {}
 
 ConstraintSet::ConstraintSet(ref<const IndependentConstraintSet> ics)
-    : _constraints(ics->exprs), _symcretes(ics->symcretes), _concretization(ics->concretization),
-      _independentElements(ics) {}
+    : _constraints(ics->getConstraints()), _symcretes(ics->getSymcretes()),
+      _concretization(ics->concretization), _independentElements(ics) {}
 
 ConstraintSet::ConstraintSet()
     : _concretization(Assignment(true)),
@@ -231,7 +231,8 @@ bool ConstraintSet::isSymcretized(ref<Expr> expr) const {
 void ConstraintSet::rewriteConcretization(const Assignment &a) {
   for (auto i : a.bindings) {
     if (concretization().bindings.count(i.first)) {
-      _concretization.bindings = _concretization.bindings.replace({i.first, i.second});
+      _concretization.bindings =
+          _concretization.bindings.replace({i.first, i.second});
     }
   }
   _independentElements.updateConcretization(a);

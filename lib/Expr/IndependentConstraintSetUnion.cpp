@@ -17,30 +17,31 @@ IndependentConstraintSetUnion::IndependentConstraintSetUnion(
   updateConcretization(c);
 }
 
-IndependentConstraintSetUnion::IndependentConstraintSetUnion(ref<const IndependentConstraintSet> ics) {
-  for(ref<Expr> e : ics->exprs){
+IndependentConstraintSetUnion::IndependentConstraintSetUnion(
+    ref<const IndependentConstraintSet> ics) {
+  for (ref<Expr> e : ics->exprs) {
     rank = rank.replace({e, 0});
     internalStorage = internalStorage.insert(e);
     disjointSets = disjointSets.replace({e, nullptr});
   }
 
-  for(ref<Symcrete> s : ics->symcretes){
+  for (ref<Symcrete> s : ics->symcretes) {
     ref<Expr> e = s->symcretized;
     rank = rank.replace({e, 0});
     internalStorage = internalStorage.insert(e);
     disjointSets = disjointSets.replace({e, nullptr});
   }
 
-  if(internalStorage.size() == 0){
+  if (internalStorage.size() == 0) {
     return;
   }
 
   ref<Expr> first = *(internalStorage.begin());
-  for(ref<Expr> e : internalStorage){
-    parent  = parent.replace({e, first});
+  for (ref<Expr> e : internalStorage) {
+    parent = parent.replace({e, first});
   }
   rank = rank.replace({first, 1});
-  roots = roots.insert(first); 
+  roots = roots.insert(first);
   disjointSets = disjointSets.replace({first, ics});
   concretization = ics->concretization;
 }
@@ -49,7 +50,7 @@ void IndependentConstraintSetUnion::updateConcretization(
     const Assignment &delta) {
   for (ref<Expr> e : roots) {
     ref<const IndependentConstraintSet> ics = disjointSets.at(e);
-    Assignment part = delta.part(ics->symcretes);
+    Assignment part = delta.part(ics->getSymcretes());
     ics = ics->updateConcretization(part, concretizedExprs);
     disjointSets = disjointSets.replace({e, ics});
   }
@@ -63,7 +64,7 @@ void IndependentConstraintSetUnion::removeConcretization(
     const Assignment &remove) {
   for (ref<Expr> e : roots) {
     ref<const IndependentConstraintSet> ics = disjointSets.at(e);
-    Assignment part = remove.part(ics->symcretes);
+    Assignment part = remove.part(ics->getSymcretes());
     ics = ics->removeConcretization(part, concretizedExprs);
     disjointSets = disjointSets.replace({e, ics});
   }
@@ -91,7 +92,7 @@ ref<const IndependentConstraintSet>
 IndependentConstraintSetUnion::getIndependentConstraints(
     const ref<Expr> &e, constraints_ty &result) const {
   ref<const IndependentConstraintSet> compare = new IndependentConstraintSet(e);
-  ref<const IndependentConstraintSet> add  = new IndependentConstraintSet();
+  ref<const IndependentConstraintSet> add = new IndependentConstraintSet();
   for (ref<Expr> i : internalStorage) {
     ref<Expr> a = constFind(i);
     ref<const IndependentConstraintSet> ics = disjointSets.at(a);
@@ -152,7 +153,6 @@ void IndependentConstraintSetUnion::addSymcrete(const ref<Symcrete> s) {
   disjointSets = disjointSets.replace(
       {find(value), disjointSets.at(find(value))->addExpr(value)});
 }
-
 
 IndependentConstraintSetUnion
 IndependentConstraintSetUnion::getConcretizedVersion() const {

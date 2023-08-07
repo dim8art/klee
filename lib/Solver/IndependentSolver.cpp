@@ -227,7 +227,7 @@ bool IndependentSolver::check(const Query &query, ref<SolverResponse> &result) {
       continue;
     }
 
-    constraints_ty factorConstraints = it->exprs;
+    constraints_ty factorConstraints = it->getConstraints();
     ref<Expr> factorExpr = ConstantExpr::alloc(0, Expr::Bool);
 
     ref<SolverResponse> tempResult;
