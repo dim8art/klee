@@ -1,7 +1,8 @@
 #ifndef KLEE_DISJOINEDSETUNION_H
 #define KLEE_DISJOINEDSETUNION_H
 #include "klee/ADT/Ref.h"
-
+#include "klee/ADT/ImmutableMap.h"
+#include "klee/ADT/ImmutableSet.h"
 #include <set>
 #include <unordered_map>
 #include <unordered_set>
@@ -9,26 +10,27 @@
 
 namespace klee {
 
-template <typename ValueType, typename SetType, typename HashType>
+template <typename ValueType, typename SetType, typename CMP = std::less<ValueType>>
 class DisjointSetUnion {
 protected:
-  std::unordered_map<ValueType, ValueType, HashType> parent;
-  std::unordered_set<ValueType, HashType> roots;
-  std::unordered_map<ValueType, size_t, HashType> rank;
+  ImmutableMap<ValueType, ValueType, CMP> parent;
+  ImmutableSet<ValueType, CMP> roots;
+  ImmutableMap<ValueType, size_t, CMP> rank;
 
-  std::unordered_set<ValueType, HashType> internalStorage;
-  std::unordered_map<ValueType, ref<const SetType>, HashType> disjointSets;
+  ImmutableSet<ValueType, CMP> internalStorage;
+  ImmutableMap<ValueType, ref<const SetType>, CMP> disjointSets;
 
   ValueType find(const ValueType &v) { // findparent
     assert(parent.find(v) != parent.end());
-    if (v == parent[v])
+    if (v == parent.at(v))
       return v;
-    return parent[v] = find(parent[v]);
+    parent = parent.replace({v, find(parent.at(v))});
+    return parent.at(v);
   }
 
   ValueType constFind(const ValueType &v) const {
     assert(parent.find(v) != parent.end());
-    ValueType v1 = parent.find(v)->second;
+    ValueType v1 = parent.at(v);
     if (v == v1)
       return v;
     return constFind(v1);
@@ -41,17 +43,17 @@ protected:
       return;
     }
 
-    if (rank[a] < rank[b]) {
+    if (rank.at(a) < rank.at(b)) {
       std::swap(a, b);
     }
-    parent[b] = a;
-    if (rank[a] == rank[b]) {
-      rank[a]++;
+    parent = parent.replace({b, a});
+    if (rank.at(a) == rank.at(b)) {
+      rank = rank.replace({a, rank.at(a)+1});
     }
 
-    roots.erase(b);
-    disjointSets[a] = SetType::merge(disjointSets[a], disjointSets[b]);
-    disjointSets[b] = nullptr;
+    roots = roots.remove(b);
+    disjointSets = disjointSets.replace({a, SetType::merge(disjointSets.at(a), disjointSets.at(b))});
+    disjointSets = disjointSets.replace({b, nullptr});
   }
 
   bool areJoined(const ValueType &i, const ValueType &j) const {
@@ -59,13 +61,13 @@ protected:
   }
 
 public:
-  using internalStorage_ty = std::unordered_set<ValueType, HashType>;
+  using internalStorage_ty = ImmutableSet<ValueType, CMP>;
   using disjointSets_ty =
-      std::unordered_map<ValueType, ref<const SetType>, HashType>;
-  using const_iterator = typename internalStorage_ty::const_iterator;
+      ImmutableMap<ValueType, ref<const SetType>, CMP>;
+  using iterator = typename internalStorage_ty::iterator;
 
-  const_iterator begin() const { return internalStorage.begin(); }
-  const_iterator end() const { return internalStorage.end(); }
+  iterator begin() const { return internalStorage.begin(); }
+  iterator end() const { return internalStorage.end(); }
 
   size_t numberOfValues() const noexcept { return internalStorage.size(); }
 
@@ -77,7 +79,7 @@ public:
     return disjointSets.find(constFind(i))->second;
   }
 
-  ref<const SetType> findGroup(const_iterator it) const {
+  ref<const SetType> findGroup(iterator it) const {
     return disjointSets.find(constFind(*it))->second;
   }
 
@@ -85,17 +87,17 @@ public:
     if (internalStorage.find(value) != internalStorage.end()) {
       return;
     }
-    parent[value] = value;
-    roots.insert(value);
-    rank[value] = 0;
-    disjointSets[value] = new SetType(value);
+    parent = parent.insert({value, value});
+    roots = roots.insert(value);
+    rank = rank.insert({value, 0});
+    disjointSets = disjointSets.insert({value, new SetType(value)});
 
-    internalStorage.insert(value);
-    std::vector<ValueType> oldRoots(roots.begin(), roots.end());
+    internalStorage = internalStorage.insert(value);
+    internalStorage_ty oldRoots = roots;
     for (ValueType v : oldRoots) {
       if (!areJoined(v, value) &&
-          SetType::intersects(disjointSets[find(v)],
-                              disjointSets[find(value)])) {
+          SetType::intersects(disjointSets.at(find(v)),
+                              disjointSets.at(find(value)))) {
         merge(v, value);
       }
     }
@@ -106,12 +108,21 @@ public:
   }
 
   void add(const DisjointSetUnion &b) {
-    parent.insert(b.parent.begin(), b.parent.end());
-    roots.insert(b.roots.begin(), b.roots.end());
-    rank.insert(b.rank.begin(), b.rank.end());
-
-    internalStorage.insert(b.internalStorage.begin(), b.internalStorage.end());
-    disjointSets.insert(b.disjointSets.begin(), b.disjointSets.end());
+    for (auto it : b.parent) {
+      parent = parent.insert(it);
+    }
+    for (auto it : b.roots) {
+      roots = roots.insert(it);
+    }
+    for (auto it : b.rank) {
+      rank = rank.insert(it);
+    }
+    for (auto it : b.internalStorage) {
+      internalStorage = internalStorage.insert(it);
+    }
+    for (auto it : b.disjointSets) {
+      disjointSets = disjointSets.insert(it);
+    }
   }
   DisjointSetUnion() {}
 

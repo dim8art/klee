@@ -19,35 +19,39 @@ IndependentConstraintSetUnion::IndependentConstraintSetUnion(
 
 IndependentConstraintSetUnion::IndependentConstraintSetUnion(ref<const IndependentConstraintSet> ics) {
   for(ref<Expr> e : ics->exprs){
-    rank[e] = 0;
-    internalStorage.insert(e);
-    disjointSets[e] = nullptr;
+    rank = rank.replace({e, 0});
+    internalStorage = internalStorage.insert(e);
+    disjointSets = disjointSets.replace({e, nullptr});
   }
+
   for(ref<Symcrete> s : ics->symcretes){
-    rank[s->symcretized] = 0;
-    internalStorage.insert(s->symcretized);
-    disjointSets[s->symcretized] = nullptr;
+    ref<Expr> e = s->symcretized;
+    rank = rank.replace({e, 0});
+    internalStorage = internalStorage.insert(e);
+    disjointSets = disjointSets.replace({e, nullptr});
   }
 
   if(internalStorage.size() == 0){
     return;
   }
+
   ref<Expr> first = *(internalStorage.begin());
   for(ref<Expr> e : internalStorage){
-    parent[e] = first;
+    parent  = parent.replace({e, first});
   }
-  rank[first] = 1;
-  roots.insert(first); 
-  disjointSets[first] = ics;
+  rank = rank.replace({first, 1});
+  roots = roots.insert(first); 
+  disjointSets = disjointSets.replace({first, ics});
   concretization = ics->concretization;
 }
 
 void IndependentConstraintSetUnion::updateConcretization(
     const Assignment &delta) {
   for (ref<Expr> e : roots) {
-    ref<const IndependentConstraintSet> &ics = disjointSets[e];
+    ref<const IndependentConstraintSet> ics = disjointSets.at(e);
     Assignment part = delta.part(ics->symcretes);
     ics = ics->updateConcretization(part, concretizedExprs);
+    disjointSets = disjointSets.replace({e, ics});
   }
   for (auto it : delta.bindings) {
     concretization.bindings[it.first] = it.second;
@@ -57,9 +61,10 @@ void IndependentConstraintSetUnion::updateConcretization(
 void IndependentConstraintSetUnion::removeConcretization(
     const Assignment &remove) {
   for (ref<Expr> e : roots) {
-    ref<const IndependentConstraintSet> &ics = disjointSets[e];
+    ref<const IndependentConstraintSet> ics = disjointSets.at(e);
     Assignment part = remove.part(ics->symcretes);
     ics = ics->removeConcretization(part, concretizedExprs);
+    disjointSets = disjointSets.replace({e, ics});
   }
   for (auto it : remove.bindings) {
     concretization.bindings.erase(it.first);
@@ -87,7 +92,7 @@ IndependentConstraintSetUnion::getIndependentConstraints(
   ref<const IndependentConstraintSet> add  = new IndependentConstraintSet();
   for (ref<Expr> i : internalStorage) {
     ref<Expr> a = constFind(i);
-    ref<const IndependentConstraintSet> ics = disjointSets.find(a)->second;
+    ref<const IndependentConstraintSet> ics = disjointSets.at(a);
     if (IndependentConstraintSet::intersects(ics, compare)) {
       add = IndependentConstraintSet::merge(ics, add);
     }
@@ -120,28 +125,30 @@ void IndependentConstraintSetUnion::getAllIndependentConstraintSets(
 }
 void IndependentConstraintSetUnion::addExpr(const ref<Expr> e) {
   addValue(e);
-  disjointSets[find(e)] = disjointSets[find(e)]->addExpr(e);
+  disjointSets =
+      disjointSets.replace({find(e), disjointSets.at(find(e))->addExpr(e)});
 }
 void IndependentConstraintSetUnion::addSymcrete(const ref<Symcrete> s) {
   ref<Expr> value = s->symcretized;
   if (internalStorage.find(value) != internalStorage.end()) {
     return;
   }
-  parent[value] = value;
-  roots.insert(value);
-  rank[value] = 0;
-  disjointSets[value] = new IndependentConstraintSet(s);
+  parent = parent.insert({value, value});
+  roots = roots.insert(value);
+  rank = rank.insert({value, 0});
+  disjointSets = disjointSets.insert({value, new IndependentConstraintSet(s)});
 
-  internalStorage.insert(value);
-  std::vector<ref<Expr>> oldRoots(roots.begin(), roots.end());
+  internalStorage = internalStorage.insert(value);
+  internalStorage_ty oldRoots = roots;
   for (ref<Expr> v : oldRoots) {
     if (!areJoined(v, value) &&
-        IndependentConstraintSet::intersects(disjointSets[find(v)],
-                                             disjointSets[find(value)])) {
+        IndependentConstraintSet::intersects(disjointSets.at(find(v)),
+                                             disjointSets.at(find(value)))) {
       merge(v, value);
     }
   }
-  disjointSets[find(value)] = disjointSets[find(value)]->addExpr(value);
+  disjointSets = disjointSets.replace(
+      {find(value), disjointSets.at(find(value))->addExpr(value)});
 }
 
 

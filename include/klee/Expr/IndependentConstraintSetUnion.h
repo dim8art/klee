@@ -7,8 +7,7 @@
 
 namespace klee {
 class IndependentConstraintSetUnion
-    : public DisjointSetUnion<ref<Expr>, IndependentConstraintSet,
-                              util::ExprHash> {
+    : public DisjointSetUnion<ref<Expr>, IndependentConstraintSet> {
 public:
   Assignment concretization;
 

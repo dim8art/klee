@@ -80,6 +80,7 @@ public:
     return elts.upper_bound(key);
   }
 
+  const D at(const key_type &key) const { return find(key)->second; }
   static size_t getAllocated() { return Tree::allocated; }
 };
 

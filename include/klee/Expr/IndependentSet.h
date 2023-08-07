@@ -84,36 +84,11 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 
 class IndependentConstraintSet {
 private:
-  struct InnerSetUnion
-      : public DisjointSetUnion<ref<Expr>, IndependentConstraintSet,
-                                util::ExprHash> {
-    using DisjointSetUnion<ref<Expr>, IndependentConstraintSet,
-                           util::ExprHash>::DisjointSetUnion;
-    void addExpr(ref<Expr> e) {
-      if (internalStorage.find(e) != internalStorage.end()) {
-        return;
-      }
-      parent[e] = e;
-      roots.insert(e);
-      rank[e] = 0;
-      disjointSets[e] = new IndependentConstraintSet(e);
-
-      internalStorage.insert(e);
-      std::vector<ref<Expr>> oldRoots(roots.begin(), roots.end());
-      for (ref<Expr> v : oldRoots) {
-        if (!areJoined(v, e) &&
-            IndependentConstraintSet::intersects(disjointSets[find(v)],
-                                                 disjointSets[find(e)])) {
-          merge(v, e);
-        }
-      }
-    }
-  };
+  using InnerSetUnion = DisjointSetUnion<ref<Expr>, IndependentConstraintSet>;
 
 public:
-  // All containers need to become persistent to make fast copy and faster merge
-  // possible
-  // map from concretized to normal
+  // All containers need to become persistent to make fast copy and faster
+  // merge possible map from concretized to normal
   typedef ImmutableMap<const Array *, DenseSet<unsigned>> elements_ty;
   elements_ty
       elements; // Represents individual elements of array accesses (arr[1])
