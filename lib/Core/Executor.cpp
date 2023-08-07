@@ -453,9 +453,9 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
                    InterpreterHandler *ih)
     : Interpreter(opts), interpreterHandler(ih), searcher(nullptr),
       externalDispatcher(new ExternalDispatcher(ctx)), statsTracker(0),
-      pathWriter(0), symPathWriter(0),
-      specialFunctionHandler(0), timers{time::Span(TimerInterval)},
-      guidanceKind(opts.Guidance), codeGraphDistance(new CodeGraphDistance()),
+      pathWriter(0), symPathWriter(0), specialFunctionHandler(0),
+      timers{time::Span(TimerInterval)}, guidanceKind(opts.Guidance),
+      codeGraphDistance(new CodeGraphDistance()),
       distanceCalculator(new DistanceCalculator(*codeGraphDistance)),
       targetCalculator(new TargetCalculator(*codeGraphDistance)),
       targetManager(new TargetManager(guidanceKind, *distanceCalculator,
@@ -5414,18 +5414,19 @@ MemoryObject *Executor::allocate(ExecutionState &state, ref<Expr> size,
   std::vector<ref<Expr>> symbolicSizesTerms = {
       ZExtExpr::create(size, pointerWidthInBits)};
 
-  constraints_ty required;
-  IndependentElementSet eltsClosure = getIndependentConstraints(
-      Query(state.constraints.cs(), ZExtExpr::create(size, pointerWidthInBits)),
-      required);
+  std::vector<ref<const IndependentConstraintSet>> factors;
+  Query(state.constraints.cs(), ZExtExpr::create(size, pointerWidthInBits))
+      .getAllDependentConstraintsSets(factors);
+
   /* Collect dependent size symcretes. */
-  for (ref<Symcrete> symcrete : eltsClosure.symcretes) {
-    if (isa<SizeSymcrete>(symcrete)) {
-      symbolicSizesTerms.push_back(
-          ZExtExpr::create(symcrete->symcretized, pointerWidthInBits));
+  for (ref<const IndependentConstraintSet> ics : factors) {
+    for (ref<Symcrete> symcrete : ics->symcretes) {
+      if (isa<SizeSymcrete>(symcrete)) {
+        symbolicSizesTerms.push_back(
+            ZExtExpr::create(symcrete->symcretized, pointerWidthInBits));
+      }
     }
   }
-
   ref<Expr> symbolicSizesSum = createNonOverflowingSumExpr(symbolicSizesTerms);
 
   std::vector<const Array *> objects;
@@ -5466,7 +5467,8 @@ MemoryObject *Executor::allocate(ExecutionState &state, ref<Expr> size,
     state.addPointerResolution(addressExpr, mo);
   }
 
-  assignment.bindings[addressArray] = sparseBytesFromValue(mo->address);
+  assignment.bindings = assignment.bindings.replace(
+      {addressArray, sparseBytesFromValue(mo->address)});
 
   state.constraints.addSymcrete(sizeSymcrete, assignment);
   state.constraints.addSymcrete(addressSymcrete, assignment);
@@ -6423,8 +6425,8 @@ void Executor::executeMakeSymbolic(ExecutionState &state,
 
         if (!obj) {
           if (ZeroSeedExtension) {
-            si.assignment.bindings[array] =
-                SparseStorage<unsigned char>(mo->size, 0);
+            si.assignment.bindings = si.assignment.bindings.replace(
+                {array, SparseStorage<unsigned char>(mo->size, 0)});
           } else if (!AllowSeedExtension) {
             terminateStateOnUserError(state,
                                       "ran out of inputs during seeding");
@@ -6444,14 +6446,19 @@ void Executor::executeMakeSymbolic(ExecutionState &state,
             terminateStateOnUserError(state, msg.str());
             break;
           } else {
-            SparseStorage<unsigned char> &values =
-                si.assignment.bindings[array];
+            SparseStorage<unsigned char> values;
+            if (si.assignment.bindings.find(array) !=
+                si.assignment.bindings.end()) {
+              values = si.assignment.bindings.at(array);
+            }
             values.resize(std::min(mo->size, obj->numBytes));
             values.store(0, obj->bytes,
                          obj->bytes + std::min(obj->numBytes, mo->size));
             if (ZeroSeedExtension) {
               values.resize(mo->size);
             }
+            si.assignment.bindings =
+                si.assignment.bindings.replace({array, values});
           }
         }
       }
@@ -7074,7 +7081,7 @@ bool Executor::getSymbolicSolution(const ExecutionState &state, KTest &res) {
 
   Assignment model = Assignment(objects, values, true);
   for (auto binding : state.constraints.cs().concretization().bindings) {
-    model.bindings.insert(binding);
+    model.bindings = model.bindings.insert(binding);
   }
 
   setInitializationGraph(state, model, res);

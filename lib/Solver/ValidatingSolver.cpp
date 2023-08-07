@@ -95,7 +95,6 @@ bool ValidatingSolver::computeInitialValues(
     const Query &query, const std::vector<const Array *> &objects,
     std::vector<SparseStorage<unsigned char>> &values, bool &hasSolution) {
   bool answer;
-  assert(!query.containsSymcretes());
 
   if (!solver->impl->computeInitialValues(query, objects, values, hasSolution))
     return false;
@@ -159,7 +158,7 @@ bool ValidatingSolver::check(const Query &query, ref<SolverResponse> &result) {
     // conjunction of the actual constraints is satisfiable.
 
     ConstraintSet bindings;
-    std::map<const Array *, SparseStorage<unsigned char>> initialValues;
+    Assignment::bindings_ty initialValues;
     cast<InvalidResponse>(result)->tryGetInitialValues(initialValues);
     Assignment solutionAssignment(initialValues);
     for (auto &arrayValues : initialValues) {

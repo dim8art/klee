@@ -241,13 +241,12 @@ bool QueryLoggingSolver::check(const Query &query,
     logBuffer << queryCommentSign
               << "   Solvable: " << (hasSolution ? "true" : "false") << "\n";
     if (hasSolution) {
-      std::map<const Array *, SparseStorage<unsigned char>> initialValues;
+      Assignment::bindings_ty initialValues;
       result->tryGetInitialValues(initialValues);
       Assignment solutionAssignment(initialValues, true);
 
-      for (std::map<const Array *, SparseStorage<unsigned char>>::const_iterator
-               i = initialValues.begin(),
-               e = initialValues.end();
+      for (Assignment::bindings_ty::iterator i = initialValues.begin(),
+                                             e = initialValues.end();
            i != e; ++i) {
         const Array *array = i->first;
         const SparseStorage<unsigned char> &data = i->second;

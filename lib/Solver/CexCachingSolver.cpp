@@ -132,7 +132,7 @@ struct isValidOrSatisfyingResponse {
   isValidOrSatisfyingResponse(KeyType &_key) : key(_key) {}
 
   bool operator()(ref<SolverResponse> a) const {
-    return isa<ValidResponse>(a) || cast<InvalidResponse>(a)->satisfies(key);
+    return isa<ValidResponse>(a) || (isa<InvalidResponse>(a) && cast<InvalidResponse>(a)->satisfies(key));
   }
 };
 
@@ -215,7 +215,6 @@ bool CexCachingSolver::searchForResponse(KeyType &key,
 /// an unsatisfiable query). \return True if a cached result was found.
 bool CexCachingSolver::lookupResponse(const Query &query, KeyType &key,
                                       ref<SolverResponse> &result) {
-  assert(!query.containsSymcretes());
   key = KeyType(query.constraints.cs().begin(), query.constraints.cs().end());
   ref<Expr> neg = Expr::createIsZero(query.expr);
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(neg)) {
@@ -264,14 +263,15 @@ bool CexCachingSolver::getResponse(const Query &query,
   }
 
   ValidityCore resultCore;
-  if (CexCacheValidityCores && result->tryGetValidityCore(resultCore)) {
+  if (CexCacheValidityCores && isa<ValidResponse>(result)) {
+    result->tryGetValidityCore(resultCore);
     KeyType resultCoreConstarints(resultCore.constraints.begin(),
                                   resultCore.constraints.end());
     ref<Expr> neg = Expr::createIsZero(query.expr);
     resultCoreConstarints.insert(neg);
     cache.insert(resultCoreConstarints, result);
-    cache.insert(key, result);
-  } else {
+  }
+  if (isa<ValidResponse>(result) || isa<InvalidResponse>(result)){
     cache.insert(key, result);
   }
 
@@ -301,13 +301,23 @@ bool CexCachingSolver::computeValidity(const Query &query,
   if (cast<ConstantExpr>(q)->isTrue()) {
     if (!getResponse(query, a))
       return false;
-    result =
-        isa<ValidResponse>(a) ? PValidity::MustBeTrue : PValidity::TrueOrFalse;
+    if(isa<ValidResponse>(a)){
+      result = PValidity::MustBeTrue;
+    } else if(isa<InvalidResponse>(a)){
+      result = PValidity::TrueOrFalse;
+    } else {
+      result = PValidity::MayBeTrue;
+    }
   } else {
     if (!getResponse(query.negateExpr(), a))
       return false;
-    result =
-        isa<ValidResponse>(a) ? PValidity::MustBeFalse : PValidity::TrueOrFalse;
+    if(isa<ValidResponse>(a)){
+      result = PValidity::MustBeFalse;
+    } else if(isa<InvalidResponse>(a)){
+      result = PValidity::TrueOrFalse;
+    } else {
+      result = PValidity::MayBeFalse;
+    }
   }
 
   return true;
@@ -341,7 +351,7 @@ bool CexCachingSolver::computeTruth(const Query &query, bool &isValid) {
 
 bool CexCachingSolver::computeValue(const Query &query, ref<Expr> &result) {
   TimerStatIncrementer t(stats::cexCacheTime);
-
+  
   ref<SolverResponse> a;
   if (!getResponse(query.withFalse(), a))
     return false;
@@ -365,7 +375,7 @@ bool CexCachingSolver::computeInitialValues(
     return false;
   hasSolution = isa<InvalidResponse>(a);
 
-  if (isa<ValidResponse>(a))
+  if (!hasSolution)
     return true;
 
   // FIXME: We should use smarter assignment for result so we don't

@@ -5,6 +5,7 @@
 #include "klee/Expr/Constraints.h"
 #include "klee/Expr/Expr.h"
 #include "klee/Expr/ExprHashMap.h"
+#include "klee/Expr/IndependentSet.h"
 #include "klee/System/Time.h"
 
 namespace klee {
@@ -78,6 +79,16 @@ public:
   friend bool operator<(const Query &lhs, const Query &rhs) {
     return lhs.constraints < rhs.constraints ||
            (lhs.constraints == rhs.constraints && lhs.expr < rhs.expr);
+  }
+
+  void getAllIndependentConstraintsSets(
+      std::vector<ref<const IndependentConstraintSet>> &result) const {
+    constraints.getAllIndependentConstraintsSets(expr, result);
+  }
+
+  void getAllDependentConstraintsSets(
+      std::vector<ref<const IndependentConstraintSet>> &result) const {
+    constraints.getAllDependentConstraintsSets(expr, result);
   }
 
   /// Dump query
@@ -239,7 +250,7 @@ public:
   }
 
   bool tryGetInitialValues(Assignment::bindings_ty &values) const {
-    values.insert(result.bindings.begin(), result.bindings.end());
+    values = result.bindings;
     return true;
   }
 
