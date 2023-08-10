@@ -239,8 +239,11 @@ bool CexCachingSolver::lookupResponse(const Query &query, KeyType &key,
 bool CexCachingSolver::getResponse(const Query &query,
                                    ref<SolverResponse> &result) {
   KeyType key;
-  if (lookupResponse(query, key, result))
+  if (lookupResponse(query, key, result)){
+    result->dump();
+    lookupResponse(query, key, result);
     return true;
+  }
 
   if (!solver->impl->check(query, result)) {
     return false;

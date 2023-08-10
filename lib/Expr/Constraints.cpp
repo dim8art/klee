@@ -188,8 +188,9 @@ ConstraintSet::ConstraintSet(ref<const IndependentConstraintSet> ics)
     : _constraints(ics->getConstraints()), _symcretes(ics->getSymcretes()),
       _concretization(ics->concretization), _independentElements(ics) {}
 
-
-ConstraintSet::ConstraintSet(const std::vector<ref<const IndependentConstraintSet>>& factors){
+ConstraintSet::ConstraintSet(
+    const std::vector<ref<const IndependentConstraintSet>> &factors)
+    : _concretization(Assignment(true)) {
   for(auto ics: factors){
     constraints_ty constraints = ics->getConstraints();
     SymcreteOrderedSet symcretes = ics->getSymcretes();
@@ -199,7 +200,6 @@ ConstraintSet::ConstraintSet(const std::vector<ref<const IndependentConstraintSe
     _concretization.addIndependentAssignment(ics->concretization);
     _independentElements.addIndependentConstraintSetUnion(icsu);
   }
-
 }
 
 ConstraintSet::ConstraintSet()

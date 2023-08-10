@@ -142,14 +142,14 @@ bool IndependentSolver::computeInitialValues(
   // We assume the query has a solution except proven differently
   // This is important in case we don't have any constraints but
   // we need initial values for requested array objects.
+  hasSolution = true;
   Assignment retMap(true);
-
   std::vector<ref<const IndependentConstraintSet>> dependentFactors;
   query.getAllDependentConstraintsSets(dependentFactors);
   ConstraintSet dependentConstriants(dependentFactors);
 
   std::vector<const Array *> dependentFactorsObjects;
-  calculateArraysInFactors(dependentFactors, dependentFactorsObjects);
+  calculateArraysInFactors(dependentFactors, query.expr, dependentFactorsObjects);
 
   if (dependentFactorsObjects.size() != 0) {
     std::vector<SparseStorage<unsigned char>> dependentFactorsValues;
@@ -212,6 +212,7 @@ bool IndependentSolver::computeInitialValues(
       // satisfy the query.
       ref<ConstantExpr> arrayConstantSize =
           dyn_cast<ConstantExpr>(retMap.evaluate(arr->size));
+      arrayConstantSize->dump();
       assert(arrayConstantSize &&
              "Array of symbolic size had not receive value for size!");
       SparseStorage<unsigned char> ret(arrayConstantSize->getZExtValue());
@@ -232,8 +233,8 @@ bool IndependentSolver::check(const Query &query, ref<SolverResponse> &result) {
   // We assume the query has a solution except proven differently
   // This is important in case we don't have any constraints but
   // we need initial values for requested array objects.
+  //result = new ValidResponse(ValidityCore());
   Assignment retMap(true);
-
   std::vector<ref<const IndependentConstraintSet>> dependentFactors;
   query.getAllDependentConstraintsSets(dependentFactors);
   ConstraintSet dependentConstriants(dependentFactors);
@@ -242,7 +243,7 @@ bool IndependentSolver::check(const Query &query, ref<SolverResponse> &result) {
   std::vector<SparseStorage<unsigned char>> dependentFactorsValues;
   ref<SolverResponse> dependentFactorsResult;
 
-  calculateArraysInFactors(dependentFactors, dependentFactorsObjects);
+  calculateArraysInFactors(dependentFactors, query.expr, dependentFactorsObjects);
 
   if (dependentFactorsObjects.size() != 0) {
     if (!solver->impl->check(query.withConstraints(dependentConstriants),
@@ -298,7 +299,6 @@ bool IndependentSolver::check(const Query &query, ref<SolverResponse> &result) {
   Assignment::bindings_ty bindings;
   bool success = result->tryGetInitialValues(bindings);
   assert(success);
-
   assert(assertCreatedPointEvaluatesToTrue(query, bindings, retMap.bindings) &&
          "should satisfy the equation");
 

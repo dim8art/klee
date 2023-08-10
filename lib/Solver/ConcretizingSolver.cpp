@@ -288,6 +288,7 @@ bool ConcretizingSolver::relaxSymcreteConstraints(const Query &query,
   }
 
   if (isa<ValidResponse>(result)) {
+    result->dump();
     return true;
   }
 
@@ -514,9 +515,7 @@ bool ConcretizingSolver::computeTruth(const Query &query, bool &isValid) {
     if (!relaxSymcreteConstraints(query, result)) {
       return false;
     }
-    if (ref<InvalidResponse> resultInvalidResponse =
-            dyn_cast<InvalidResponse>(result)) {
-      assign = resultInvalidResponse->initialValuesFor(assign.keys());
+    if (isa<InvalidResponse>(result)) {
       isValid = false;
     }
   }

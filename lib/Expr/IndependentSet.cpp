@@ -78,7 +78,7 @@ void IndependentConstraintSet::addValuesToAssignment(
     const std::vector<const Array *> &objects,
     const std::vector<SparseStorage<unsigned char>> &values,
     Assignment &assign) const {
-  for (unsigned i = 0; i < values.size(); i++) {
+  for (unsigned i = 0; i < objects.size(); i++) {
     if (assign.bindings.count(objects[i])) {
       SparseStorage<unsigned char> value = assign.bindings.at(objects[i]);
       assert(value.size() == values[i].size() &&
@@ -350,12 +350,15 @@ void IndependentConstraintSet::calculateArrayReferences(
 
 void calculateArraysInFactors(
     const std::vector<ref<const IndependentConstraintSet>> &factors,
-    std::vector<const Array *> &returnVector) {
+    ref<Expr> queryExpr, std::vector<const Array *> &returnVector) {
   for (ref<const IndependentConstraintSet> ics : factors) {
     std::vector<const Array *> result;
     ics->calculateArrayReferences(result);
     returnVector.insert(returnVector.begin(), result.begin(), result.end());
   }
+    std::vector<const Array *> result;
+    (new IndependentConstraintSet(queryExpr))->calculateArrayReferences(result);
+    returnVector.insert(returnVector.begin(), result.begin(), result.end());
 }
 
 } // namespace klee

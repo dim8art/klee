@@ -7007,6 +7007,11 @@ Assignment Executor::computeConcretization(const ConstraintSet &constraints,
         constraints, Expr::createIsZero(condition), response, queryMetaData);
     solver->setTimeout(time::Span());
     assert(success);
+    if(!isa<InvalidResponse>(response)){
+      response->dump();
+      solver->getResponse(
+        constraints, Expr::createIsZero(condition), response, queryMetaData);
+    }
     assert(isa<InvalidResponse>(response));
     concretization = cast<InvalidResponse>(response)->initialValuesFor(
         constraints.gatherSymcretizedArrays());

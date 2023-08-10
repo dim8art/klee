@@ -157,7 +157,7 @@ public:
 
 void calculateArraysInFactors(
     const std::vector<ref<const IndependentConstraintSet>> &factors,
-    std::vector<const Array *> &returnVector);
+    ref<Expr> queryExpr, std::vector<const Array *> &returnVector);
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                                      const IndependentConstraintSet &ies) {
