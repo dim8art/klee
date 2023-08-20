@@ -115,10 +115,19 @@ inline bool Assignment::satisfies(InputIterator begin, InputIterator end,
                                   bool allowFreeValues) {
   AssignmentEvaluator v(*this, allowFreeValues);
   for (; begin != end; ++begin) {
-    if ((*begin)->getWidth() == Expr::Bool && !v.visit(*begin)->isTrue())
+    assert((*begin)->getWidth() == Expr::Bool && "constraints must be boolean");
+    if (!v.visit(*begin)->isTrue())
       return false;
-    if ((*begin)->getWidth() != Expr::Bool &&
-        !isa<ConstantExpr>(v.visit(*begin)))
+  }
+  return true;
+}
+
+template <typename InputIterator>
+inline bool Assignment::satisfiesNonBoolean(InputIterator begin, InputIterator end,
+                                  bool allowFreeValues) {
+  AssignmentEvaluator v(*this, allowFreeValues);
+  for (; begin != end; ++begin) {
+    if (!isa<ConstantExpr>(v.visit(*begin)))
       return false;
   }
   return true;
