@@ -287,11 +287,12 @@ public:
     return result.bindings < ib.result.bindings;
   }
 
-  bool satisfies(std::set<ref<Expr>> &key, bool allowFreeValues = true) {
+  bool satisfies(const std::set<ref<Expr>> &key, bool allowFreeValues = true) {
     return result.satisfies(key.begin(), key.end(), allowFreeValues);
   }
 
-  bool satisfiesNonBoolean(std::set<ref<Expr>> &key, bool allowFreeValues = true) {
+  bool satisfiesNonBoolean(const std::set<ref<Expr>> &key,
+                           bool allowFreeValues = true) {
     return result.satisfiesNonBoolean(key.begin(), key.end(), allowFreeValues);
   }
 
