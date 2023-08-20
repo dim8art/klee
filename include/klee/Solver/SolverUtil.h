@@ -291,6 +291,10 @@ public:
     return result.satisfies(key.begin(), key.end(), allowFreeValues);
   }
 
+  bool satisfiesNonBoolean(std::set<ref<Expr>> &key, bool allowFreeValues = true) {
+    return result.satisfiesNonBoolean(key.begin(), key.end(), allowFreeValues);
+  }
+
   void dump() { result.dump(); }
 
   ref<Expr> evaluate(ref<Expr> e, bool allowFreeValues = true) {
