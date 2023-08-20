@@ -60,6 +60,9 @@ public:
   template <typename InputIterator>
   bool satisfies(InputIterator begin, InputIterator end,
                  bool allowFreeValues = true);
+  template <typename InputIterator>
+  bool satisfiesNonBoolean(InputIterator begin, InputIterator end,
+                           bool allowFreeValues = true);
   void dump() const;
 
   Assignment diffWith(const Assignment &other) const;
@@ -123,8 +126,9 @@ inline bool Assignment::satisfies(InputIterator begin, InputIterator end,
 }
 
 template <typename InputIterator>
-inline bool Assignment::satisfiesNonBoolean(InputIterator begin, InputIterator end,
-                                  bool allowFreeValues) {
+inline bool Assignment::satisfiesNonBoolean(InputIterator begin,
+                                            InputIterator end,
+                                            bool allowFreeValues) {
   AssignmentEvaluator v(*this, allowFreeValues);
   for (; begin != end; ++begin) {
     if (!isa<ConstantExpr>(v.visit(*begin)))
