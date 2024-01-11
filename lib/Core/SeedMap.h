@@ -28,6 +28,9 @@ public:
   void push_back(ExecutionState *state, std::vector<SeedInfo>::iterator siit);
   std::size_t count(ExecutionState *state);
   std::vector<SeedInfo> &at(ExecutionState *state);
+  unsigned size(){
+    return seedMap.size();
+  }
   bool empty();
 
   virtual ~SeedMap();

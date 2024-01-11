@@ -74,6 +74,14 @@ cl::opt<bool> UseBatchingSearch(
              "(default=false)"),
     cl::init(false), cl::cat(SearchCat));
 
+cl::opt<bool> UseSeededSearch(
+    "use-seeded-search",
+    cl::desc("Use batching searcher (keep running selected state for N "
+             "instructions/time, see --batch-instructions and --batch-time) "
+             "(default=false)"),
+    cl::init(false)
+    , cl::cat(SearchCat)); //cringe
+
 cl::opt<unsigned> BatchInstructions(
     "batch-instructions",
     cl::desc("Number of instructions to batch when using "
@@ -186,6 +194,13 @@ Searcher *klee::constructUserSearcher(Executor &executor,
   if (UseIterativeDeepeningSearch != HaltExecution::Reason::Unspecified) {
     searcher =
         new IterativeDeepeningSearcher(searcher, UseIterativeDeepeningSearch);
+  }
+
+  if (UseSeededSearch) {
+    std::vector<ExecutionState *> &unseededStates = executor.getUnseededStates();
+    std::vector<ExecutionState *> &seededStates = executor.getSeededStates();
+
+    searcher = new SeededSearcher(searcher, unseededStates, seededStates);
   }
 
   llvm::raw_ostream &os = executor.getHandler().getInfoStream();

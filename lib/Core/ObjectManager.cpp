@@ -75,6 +75,8 @@ void ObjectManager::updateSubscribers() {
     current = nullptr;
     addedStates.clear();
     removedStates.clear();
+    unseededStates.clear();
+    seededStates.clear();
     statesUpdated = false;
   }
 }

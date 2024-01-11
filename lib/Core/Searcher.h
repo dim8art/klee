@@ -374,6 +374,114 @@ public:
   void printName(llvm::raw_ostream &os) override;
 };
 
+// cringe: add description
+// cringe: to cpp file
+class SeededSearcher final : public Searcher {
+  std::unique_ptr<Searcher> baseSearcher;
+  std::unique_ptr<BFSSearcher> seededSearcher;
+  std::vector<ExecutionState *> &unseededStates;
+  std::vector<ExecutionState *> &seededStates;
+  std::set<ExecutionState *> baseSearcherStates;
+  std::set<ExecutionState *> seededSearcherStates;
+
+public:
+  explicit SeededSearcher(Searcher *_searcher,
+                          std::vector<ExecutionState *> &_unseededStates,
+                          std::vector<ExecutionState *> &_seededStates)
+      : baseSearcher(_searcher), unseededStates(_unseededStates),
+        seededStates(_seededStates) {
+    seededSearcher = std::unique_ptr<BFSSearcher>(new BFSSearcher());
+  }
+  ExecutionState &selectState() override {
+    update(nullptr, {}, {});
+    if (!seededSearcher->empty()) {
+      return seededSearcher->selectState();
+    }
+    return baseSearcher->selectState();
+  }
+
+  void update(ExecutionState *current, const std::vector<ExecutionState *> &addedStates,
+              const std::vector<ExecutionState *> &removedStates) override {
+    for (auto state : seededStates) {
+      if(baseSearcherStates.count(state) != 0 && seededSearcherStates.count(state) == 0){
+        baseSearcher->update(nullptr, {}, {state});
+        seededSearcher->update(nullptr, {state}, {});
+        baseSearcherStates.erase(state);
+        seededSearcherStates.insert(state);
+      }
+    }
+    for (auto state : unseededStates) {
+      if(state == current){
+        current = nullptr;
+      }
+      if(seededSearcherStates.count(state) !=0 && baseSearcherStates.count(state) == 0) {
+        seededSearcher->update(nullptr, {}, {state});
+        baseSearcher->update(nullptr, {state}, {});
+        seededSearcherStates.erase(state);
+        baseSearcherStates.insert(state);
+      }
+    }
+    
+    std::vector<ExecutionState *> addedUnseededStates;
+    std::vector<ExecutionState *> addedSeededStates;
+    std::vector<ExecutionState *> removedUnseededStates;
+    std::vector<ExecutionState *> removedSeededStates;
+    for (auto state : addedStates) {
+      if (state->isSeeded) {
+        addedSeededStates.push_back(state);
+        seededSearcherStates.insert(state);
+      } else {
+        addedUnseededStates.push_back(state);
+        baseSearcherStates.insert(state);
+      }
+    }
+    for (auto state : removedStates) {
+      if (state->isSeeded) {
+        removedSeededStates.push_back(state);
+        seededSearcherStates.erase(state);
+      } else {
+        removedUnseededStates.push_back(state);
+        baseSearcherStates.erase(state);
+      }
+    }
+
+    if (current && current->isSeeded) {
+      baseSearcher->update(nullptr, addedUnseededStates, removedUnseededStates);
+      seededSearcher->update(current, addedSeededStates, removedSeededStates);
+    } else if (current && !current->isSeeded) {
+      baseSearcher->update(current, addedUnseededStates, removedUnseededStates);
+      seededSearcher->update(nullptr, addedSeededStates, removedSeededStates);
+    } else {
+      baseSearcher->update(nullptr, addedUnseededStates, removedUnseededStates);
+      seededSearcher->update(nullptr, addedSeededStates, removedSeededStates);
+    }
+
+    for (auto state : seededStates) {
+      if(baseSearcherStates.count(state) != 0 && seededSearcherStates.count(state) == 0){
+        baseSearcher->update(nullptr, {}, {state});
+        seededSearcher->update(nullptr, {state}, {});
+        baseSearcherStates.erase(state);
+        seededSearcherStates.insert(state);
+      }
+    }
+    for (auto state : unseededStates) {
+      if(seededSearcherStates.count(state) !=0 && baseSearcherStates.count(state) == 0) {
+        seededSearcher->update(nullptr, {}, {state});
+        baseSearcher->update(nullptr, {state}, {});
+        seededSearcherStates.erase(state);
+        baseSearcherStates.insert(state);
+      }
+    }
+  }
+  ~SeededSearcher() override = default;
+  bool empty() override {
+    return baseSearcher->empty() && seededSearcher->empty();
+  }
+  void printName(llvm::raw_ostream &os) override {
+    os << "SeededSearcher\n";
+  } // cringe
+};
+
 } // namespace klee
 
 #endif /* KLEE_SEARCHER_H */

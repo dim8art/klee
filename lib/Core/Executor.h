@@ -162,6 +162,13 @@ private:
 
   ExprHashMap<std::pair<ref<Expr>, llvm::Type *>> constantGepExprBases;
 
+  std::vector<ExecutionState *> &getUnseededStates(){
+    return objectManager->getUnseededStates();
+  }
+  std::vector<ExecutionState *> &getSeededStates(){
+    return objectManager->getSeededStates();
+  }
+
   /// When non-empty the Executor is running in "seed" mode. The
   /// states in this map will be executed in an arbitrary order
   /// (outside the normal search interface) until they terminate. When
@@ -198,7 +205,7 @@ private:
 
   /// When non-null a list of "seed" inputs which will be used to
   /// drive execution.
-  const std::vector<struct KTest *> *usingSeeds;
+  const std::vector<SeedStruct> *usingSeeds;
 
   /// Disables forking, instead a random path is chosen. Enabled as
   /// needed to control memory usage. \see fork()
@@ -700,6 +707,8 @@ private:
   void dumpPForest();
 
   void executeAction(ref<SearcherAction> action);
+  
+  bool reachedMaxSeedInstructions(ExecutionState *state);
   void goForward(ref<ForwardAction> action);
 
   const KInstruction *getKInst(const llvm::Instruction *ints) const;
@@ -741,7 +750,7 @@ public:
       const std::set<std::string> &ignoredExternals,
       std::vector<std::pair<std::string, std::string>> redefinitions) override;
 
-  void useSeeds(const std::vector<struct KTest *> *seeds) override {
+  void useSeeds(const std::vector<SeedStruct> *seeds) override {
     usingSeeds = seeds;
   }
 
@@ -820,6 +829,8 @@ public:
 
   void getBlockPath(const ExecutionState &state,
                     std::string &blockPath) override;
+
+  void getSteppedInstructions(const ExecutionState &state, unsigned &res);
 
   Expr::Width getWidthForLLVMType(llvm::Type *type) const;
   size_t getAllocationAlignment(const llvm::Value *allocSite) const;

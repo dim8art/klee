@@ -60,6 +60,28 @@ public:
   ExecutionState *branchState(ExecutionState *state, BranchType reason);
   void removeState(ExecutionState *state);
 
+  void unseed(ExecutionState *state) {
+    if(state->isSeeded) {
+      state->isSeeded = false;
+      unseededStates.push_back(state);
+    }
+  }
+  void seed(ExecutionState *state) {
+    if(!state->isSeeded) {
+      state->isSeeded = true;
+      seededStates.push_back(state);
+    }
+  }
+  std::vector<ExecutionState *> &getUnseededStates(){
+    return unseededStates; 
+  }
+  std::vector<ExecutionState *> &getSeededStates(){
+     return seededStates; 
+  }
+
+  ExecutionState *initializeState(KInstruction *location,
+                                  std::set<ref<Target>> targets);
+
   const states_ty &getStates();
 
   void updateSubscribers();
@@ -80,6 +102,9 @@ public:
   ExecutionState *current = nullptr;
   std::vector<ExecutionState *> addedStates;
   std::vector<ExecutionState *> removedStates;
+
+  std::vector<ExecutionState *> unseededStates;
+  std::vector<ExecutionState *> seededStates;
 };
 
 class Subscriber {

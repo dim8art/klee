@@ -100,6 +100,11 @@ cl::opt<bool> WriteKTests(
     cl::desc("Write .ktest files for each test case (default=true)"),
     cl::cat(TestCaseCat));
 
+cl::opt<bool> WriteSeeds(
+    "write-seeds", cl::init(true),
+    cl::desc("Write seed files files for each test case (default=true)"),
+    cl::cat(TestCaseCat));
+
 cl::opt<bool>
     WriteCVCs("write-cvcs",
               cl::desc("Write .cvc files for each test case (default=false)"),
@@ -674,7 +679,7 @@ void KleeHandler::processTestCase(const ExecutionState &state,
     ktest.args = m_argv;
     ktest.symArgvs = 0;
     ktest.symArgvLen = 0;
-
+    bool isCompleted = message == nullptr;
     bool success = m_interpreter->getSymbolicSolution(state, ktest);
 
     if (!success)
@@ -684,7 +689,20 @@ void KleeHandler::processTestCase(const ExecutionState &state,
     bool atLeastOneGenerated = false;
 
     if (success) {
-      if (WriteKTests) {
+      if (WriteSeeds) {
+
+        for (unsigned i = 0; i < ktest.uninitCoeff + 1; ++i) {
+          unsigned steppedInstructions;
+          m_interpreter->getSteppedInstructions(state, steppedInstructions);
+          if (!seedToFile(
+                  steppedInstructions, isCompleted, &ktest,
+                  getOutputFilename(getTestFilename("", id, i)).c_str())) {
+            klee_warning("unable to write output test case, losing it");
+          } else {
+            atLeastOneGenerated = true;
+          }
+        }
+      } else if (WriteKTests) {
         for (unsigned i = 0; i < ktest.uninitCoeff + 1; ++i) {
           if (!kTest_toFile(
                   &ktest,
@@ -1561,15 +1579,15 @@ static int run_klee_on_function(int pArgc, char **pArgv, char **pEnvp,
       kTests.pop_back();
     }
   } else {
-    std::vector<KTest *> seeds;
+    std::vector<SeedStruct> seeds;
     for (std::vector<std::string>::iterator it = SeedOutFile.begin(),
                                             ie = SeedOutFile.end();
          it != ie; ++it) {
-      KTest *out = kTest_fromFile(it->c_str());
-      if (!out) {
-        klee_error("unable to open: %s\n", (*it).c_str());
-      }
-      seeds.push_back(out);
+      SeedStruct out = seedInfoFromFile(it->c_str());
+        if (!out.ktest) {
+          klee_error("unable to open: %s\n", (*it).c_str());
+        }
+        seeds.push_back(out);
     }
     for (std::vector<std::string>::iterator it = SeedOutDir.begin(),
                                             ie = SeedOutDir.end();
@@ -1579,8 +1597,8 @@ static int run_klee_on_function(int pArgc, char **pArgv, char **pEnvp,
       for (std::vector<std::string>::iterator it2 = kTestFiles.begin(),
                                               ie = kTestFiles.end();
            it2 != ie; ++it2) {
-        KTest *out = kTest_fromFile(it2->c_str());
-        if (!out) {
+        SeedStruct out = seedInfoFromFile(it2->c_str());
+        if (!out.ktest) {
           klee_error("unable to open: %s\n", (*it2).c_str());
         }
         seeds.push_back(out);
@@ -1605,7 +1623,7 @@ static int run_klee_on_function(int pArgc, char **pArgv, char **pEnvp,
     interpreter->runFunctionAsMain(mainFn, pArgc, pArgv, pEnvp);
 
     while (!seeds.empty()) {
-      kTest_free(seeds.back());
+      kTest_free(seeds.back().ktest);
       seeds.pop_back();
     }
   }

@@ -13,6 +13,7 @@
 #include "klee/Module/Annotation.h"
 
 #include "klee/Module/SarifReport.h"
+#include "klee/ADT/KTest.h"
 
 #include <cstdint>
 #include <map>
@@ -203,7 +204,7 @@ public:
 
   // supply a set of symbolic bindings that will be used as "seeds"
   // for the search. use null to reset.
-  virtual void useSeeds(const std::vector<struct KTest *> *seeds) = 0;
+  virtual void useSeeds(const std::vector<SeedStruct> *seeds) = 0;
 
   virtual void runFunctionAsMain(llvm::Function *f, int argc, char **argv,
                                  char **envp) = 0;
@@ -228,6 +229,8 @@ public:
 
   virtual void getConstraintLog(const ExecutionState &state, std::string &res,
                                 LogType logFormat = STP) = 0;
+
+  virtual void getSteppedInstructions(const ExecutionState &state, unsigned &res) = 0;
 
   virtual bool getSymbolicSolution(const ExecutionState &state, KTest &res) = 0;
 

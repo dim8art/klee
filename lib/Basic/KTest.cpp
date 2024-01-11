@@ -13,6 +13,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <string>
+#include <fstream>
+#include <cassert>
 
 #define KTEST_VERSION 4
 #define KTEST_MAGIC_SIZE 5
@@ -217,6 +220,20 @@ error:
   return 0;
 }
 
+struct SeedStruct seedInfoFromFile(const char *path) {
+  std::string seedInfo = std::string(path).substr(0, std::string(path).size() - 5) + "seedinfo";
+  std::ifstream seedInfoStream(seedInfo);
+  SeedStruct seed;
+  if (seedInfoStream.good()) {
+    seedInfoStream >> seed.instructions;
+    seedInfoStream >> seed.isCompleted;
+  }
+  seed.ktest = kTest_fromFile(path);
+  
+  return seed;
+}
+
+
 int kTest_toFile(const KTest *bo, const char *path) {
   FILE *f = fopen(path, "wb");
   unsigned i, j;
@@ -273,6 +290,13 @@ error:
     fclose(f);
 
   return 0;
+}
+
+int seedToFile(unsigned instructions, unsigned isCompleted, const KTest *bo, const char *path) {
+  std::ofstream out(std::string(path) + "seedinfo");
+  out << instructions << "\n";
+  out << isCompleted;
+  return kTest_toFile(bo, (std::string(path) + "ktest").c_str());
 }
 
 unsigned kTest_numBytes(KTest *bo) {

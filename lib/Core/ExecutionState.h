@@ -294,6 +294,7 @@ private:
 public:
   using stack_ty = ExecutionStack;
 
+  bool isSeeded = false;
   // Execution - Control Flow specific
 
   /// @brief Pointer to initial instruction

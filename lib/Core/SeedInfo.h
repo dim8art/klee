@@ -28,11 +28,15 @@ class SeedInfo {
 public:
   Assignment assignment;
   KTest *input;
+  unsigned maxInstructions = 0;
+  bool isCompleted = 0;
   unsigned inputPosition;
   std::set<struct KTestObject *> used;
 
 public:
-  explicit SeedInfo(KTest *_input) : input(_input), inputPosition(0) {}
+  explicit SeedInfo(KTest *input, unsigned maxInstructions, bool isCompleted)
+      : input(input), maxInstructions(maxInstructions),
+        isCompleted(isCompleted), inputPosition(0) {}
 
   KTestObject *getNextInput(const MemoryObject *mo, bool byName);
 
