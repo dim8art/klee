@@ -17,6 +17,7 @@
 #include <fstream>
 #include <cassert>
 
+
 #define KTEST_VERSION 4
 #define KTEST_MAGIC_SIZE 5
 #define KTEST_MAGIC "KTEST"
@@ -227,11 +228,14 @@ struct SeedStruct seedInfoFromFile(const char *path) {
   if (seedInfoStream.good()) {
     seedInfoStream >> seed.instructions;
     seedInfoStream >> seed.isCompleted;
+    if(seed.isCompleted){
+      return seed; //cringe
+    }
   }
+  strcpy(seed.path, path);
   seed.ktest = kTest_fromFile(path);
-  
   return seed;
-}
+}//cringe
 
 
 int kTest_toFile(const KTest *bo, const char *path) {

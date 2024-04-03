@@ -59,7 +59,7 @@ public:
 
   virtual void processTestCase(const ExecutionState &state, const char *message,
                                const char *suffix, bool isError = false) = 0;
-
+  virtual std::vector<SeedStruct> uploadNewSeeds() = 0;
   virtual ToolJson info() const = 0;
 };
 
@@ -201,10 +201,6 @@ public:
   // take on forks. this can be used to drive the interpretation down
   // a user specified path. use null to reset.
   virtual void setReplayPath(const std::vector<bool> *path) = 0;
-
-  // supply a set of symbolic bindings that will be used as "seeds"
-  // for the search. use null to reset.
-  virtual void useSeeds(const std::vector<SeedStruct> *seeds) = 0;
 
   virtual void runFunctionAsMain(llvm::Function *f, int argc, char **argv,
                                  char **envp) = 0;

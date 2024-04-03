@@ -153,6 +153,12 @@ cl::opt<bool> PruneAlreadyExecutedStates(
     cl::desc("Explore paths that don't have already explored seeds (default=false)"),
     cl::init(false), cl::cat(ExecCat));
 
+//cringe: add logic to run forever prune states and seeding
+cl::opt<bool> RunForever(
+    "run-forever",
+    cl::desc("run forever"),
+    cl::init(false), cl::cat(ExecCat));
+
 cl::opt<bool> UseAdvancedTypeSystem(
     "use-advanced-type-system",
     cl::desc("Use advanced information about type system from "
@@ -502,7 +508,7 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
                                       *targetCalculator)),
       targetedExecutionManager(
           new TargetedExecutionManager(*codeGraphInfo, *targetManager)),
-      replayKTest(0), replayPath(0), usingSeeds(0), atMemoryLimit(false),
+      replayKTest(0), replayPath(0), atMemoryLimit(false),
       inhibitForking(false), coverOnTheFly(false),
       haltExecution(HaltExecution::NotHalt), ivcEnabled(false),
       debugLogBuffer(debugBufferString), sarifReport({}) {
@@ -1307,7 +1313,7 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
   }
 
   if (!isSeeding) {
-    assert(seedMap->size() == 0 && "unseeded paths should not go before seeded");
+    if(!RunForever) assert(seedMap->size() == 0 && "unseeded paths should not go before seeded"); 
     if (replayPath && !isInternal) {
       assert(replayPosition < replayPath->size() &&
              "ran out of branches in replay path mode");
@@ -1359,7 +1365,7 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
     } else if (!trueSeeds.empty() && !falseSeeds.empty()) {
       res = PValidity::TrueOrFalse;
     } else {
-      assert(false && "Some states should be seeded");
+      //assert(false && "Some states should be seeded");
     }
   }
 
@@ -4333,15 +4339,25 @@ const KFunction *Executor::getKFunction(const llvm::Function *f) const {
   return (kfIt == kmodule->functionMap.end()) ? nullptr : kfIt->second;
 }
 
-void Executor::seed(ExecutionState &initialState) {
+void Executor::initialSeed(ExecutionState &initialState) {
+  std::vector<SeedStruct> usingSeeds = interpreterHandler->uploadNewSeeds();
+  if(usingSeeds.empty()){
+    return;
+  }
   std::vector<SeedInfo> &v = seedMap->at(&initialState);
-
-  for (std::vector<SeedStruct>::const_iterator it = usingSeeds->begin(),
-                                               ie = usingSeeds->end();
+  for (std::vector<SeedStruct>::const_iterator it = usingSeeds.begin(),
+                                               ie = usingSeeds.end();
        it != ie; ++it) {
     if (!(it->isCompleted && PruneAlreadyExecutedStates)) {
       v.push_back(SeedInfo(it->ktest, it->instructions, it->isCompleted));
     } 
+    if(RunForever){
+      llvm::errs()<<"deleting seed\n" << (std::string(it->path) + "ktest").c_str() << "\n";
+      std::remove((std::string(it->path) + "seedinfo").c_str());
+      std::remove((std::string(it->path) + "path").c_str());
+      std::remove((std::string(it->path) + "early").c_str());
+      std::remove((std::string(it->path) + "ktest").c_str());
+    }
   }
   objectManager->seed(&initialState);
 }
@@ -4417,9 +4433,7 @@ void Executor::run(ExecutionState *initialState) {
 
   objectManager->initialUpdate();
 
-  if (usingSeeds) {
-    seed(*initialState);
-  }
+  initialSeed(*initialState);
 
   // main interpreter loop
   while (!haltExecution && !searcher->empty()) {
@@ -4428,6 +4442,9 @@ void Executor::run(ExecutionState *initialState) {
     objectManager->updateSubscribers();
 
     if (!checkMemoryUsage()) {
+      if (RunForever) {
+        initialSeed(*initialState);
+      }
       objectManager->updateSubscribers();
     }
   }
@@ -4529,7 +4546,9 @@ bool Executor::reachedMaxSeedInstructions(ExecutionState *state){
   assert(state->isSeeded);
   auto it = seedMap->find(state);
   assert(it!=seedMap->end());
-  if(it->second.size() != 1)  {return false;}
+  if (it->second.size() != 1) {
+    return false;
+  }
 
   std::vector<SeedInfo>::iterator siit = it->second.begin();
   if (siit->maxInstructions &&
@@ -4568,9 +4587,7 @@ void Executor::goForward(ref<ForwardAction> action) {
   } else if (fa->state->isCycled(MaxCycles)) {
     terminateStateEarly(*fa->state, "max-cycles exceeded.",
                         StateTerminationType::MaxCycles);
-  } 
-    else if(!fa->state->isSeeded || !reachedMaxSeedInstructions(fa->state)) 
-  {
+  } else if(!fa->state->isSeeded || !reachedMaxSeedInstructions(fa->state)) {
     maxNewWriteableOSSize = 0;
     maxNewStateStackSize = 0;
 
@@ -4588,9 +4605,6 @@ void Executor::goForward(ref<ForwardAction> action) {
   if (targetCalculator && TrackCoverage != TrackCoverageBy::None &&
       targetCalculator->isCovered(fa->state->initPC->parent->parent)) {
     haltExecution = HaltExecution::CovCheck;
-  }
-  if(seedMap->size() == 0){
-    haltExecution = HaltExecution::ReachedTarget;
   }
 }
 

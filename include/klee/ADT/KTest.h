@@ -62,6 +62,7 @@ struct SeedStruct {
   KTest * ktest;
   unsigned instructions;
   unsigned isCompleted; 
+  char *path;
 };
 
 struct SeedStruct seedInfoFromFile(const char *path);

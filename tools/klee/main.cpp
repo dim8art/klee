@@ -9,6 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+
 #include "klee/ADT/KTest.h"
 #include "klee/ADT/TreeStream.h"
 #include "klee/Config/Version.h"
@@ -180,6 +181,11 @@ cl::opt<std::string>
 cl::opt<std::string> OutputDir(
     "output-dir",
     cl::desc("Directory in which to write results (default=klee-out-<N>)"),
+    cl::init(""), cl::cat(StartCat));
+
+cl::opt<std::string> OutputEarlyDir(
+    "output-early-dir",
+    cl::desc("Directory in which to write early results (default=klee-out-<N>)"),
     cl::init(""), cl::cat(StartCat));
 
 cl::opt<std::string> Environ(
@@ -426,6 +432,26 @@ class ExecutionState;
 
 /***/
 
+static void getKTestFilesInDir(std::string directoryPath,
+                                     std::vector<std::string> &results) {
+  std::error_code ec;
+  llvm::sys::fs::directory_iterator i(directoryPath, ec), e;
+  for (; i != e && !ec; i.increment(ec)) {
+    auto f = i->path();
+    if (f.size() >= 6 && f.substr(f.size() - 6, f.size()) == ".ktest") {
+      results.push_back(f);
+    }
+  }
+
+  if (ec) {
+    llvm::errs() << "ERROR: unable to read output directory: " << directoryPath
+                 << ": " << ec.message() << "\n";
+    exit(1);
+  }
+}
+
+/***/
+
 class KleeHandler : public InterpreterHandler {
 private:
   Interpreter *m_interpreter;
@@ -474,9 +500,6 @@ public:
   // load a .path file
   static void loadPathFile(std::string name, std::vector<bool> &buffer);
 
-  static void getKTestFilesInDir(std::string directoryPath,
-                                 std::vector<std::string> &results);
-
   static std::string getRunTimeLibraryPath(const char *argv0);
 
   void setOutputDirectory(const std::string &directory);
@@ -484,6 +507,45 @@ public:
   SmallString<128> getOutputDirectory() const;
 
   ToolJson info() const override;
+
+  std::vector<SeedStruct> uploadNewSeeds() {
+    std::vector<SeedStruct> seeds;
+    for (std::vector<std::string>::iterator it = SeedOutFile.begin(),
+                                            ie = SeedOutFile.end();
+         it != ie; ++it) {
+      SeedStruct out = seedInfoFromFile(it->c_str());
+      if (!out.ktest) {
+        if(!out.isCompleted){
+          klee_error("unable to open: %s\n", (*it).c_str());
+        }
+      } else {
+        seeds.push_back(out);
+      }
+    }
+    for (std::vector<std::string>::iterator it = SeedOutDir.begin(),
+                                            ie = SeedOutDir.end();
+         it != ie; ++it) {
+      std::vector<std::string> kTestFiles;
+      getKTestFilesInDir(*it, kTestFiles);
+      for (std::vector<std::string>::iterator it2 = kTestFiles.begin(),
+                                              ie = kTestFiles.end();
+           it2 != ie; ++it2) {
+        SeedStruct out = seedInfoFromFile(it2->c_str());
+        if (!out.ktest) {
+          klee_error("unable to open: %s\n", (*it2).c_str());
+        } else {
+          seeds.push_back(out);
+        }
+      }
+      if (kTestFiles.empty()) {
+        llvm::errs() << "seeds directory is empty: " << (*it).c_str() << "\n";
+      }
+    }
+    for(auto i: seeds){
+        llvm::errs()<<i.path;
+    }
+    return seeds;
+  }
 };
 
 KleeHandler::KleeHandler(int argc, char **argv)
@@ -915,24 +977,6 @@ void KleeHandler::loadPathFile(std::string name, std::vector<bool> &buffer) {
     if (f.good())
       buffer.push_back(!!value);
     f.get();
-  }
-}
-
-void KleeHandler::getKTestFilesInDir(std::string directoryPath,
-                                     std::vector<std::string> &results) {
-  std::error_code ec;
-  llvm::sys::fs::directory_iterator i(directoryPath, ec), e;
-  for (; i != e && !ec; i.increment(ec)) {
-    auto f = i->path();
-    if (f.size() >= 6 && f.substr(f.size() - 6, f.size()) == ".ktest") {
-      results.push_back(f);
-    }
-  }
-
-  if (ec) {
-    llvm::errs() << "ERROR: unable to read output directory: " << directoryPath
-                 << ": " << ec.message() << "\n";
-    exit(1);
   }
 }
 
@@ -1532,14 +1576,14 @@ static int run_klee_on_function(int pArgc, char **pArgv, char **pEnvp,
   }
 
   if (!ReplayKTestDir.empty() || !ReplayKTestFile.empty()) {
-    assert(SeedOutFile.empty());
+    /*assert(SeedOutFile.empty());
     assert(SeedOutDir.empty());
 
     std::vector<std::string> kTestFiles = ReplayKTestFile;
     for (std::vector<std::string>::iterator it = ReplayKTestDir.begin(),
                                             ie = ReplayKTestDir.end();
          it != ie; ++it)
-      KleeHandler::getKTestFilesInDir(*it, kTestFiles);
+      getKTestFilesInDir(*it, kTestFiles);
     std::vector<KTest *> kTests;
     for (std::vector<std::string>::iterator it = kTestFiles.begin(),
                                             ie = kTestFiles.end();
@@ -1577,41 +1621,8 @@ static int run_klee_on_function(int pArgc, char **pArgv, char **pEnvp,
     while (!kTests.empty()) {
       kTest_free(kTests.back());
       kTests.pop_back();
-    }
+    }*/
   } else {
-    std::vector<SeedStruct> seeds;
-    for (std::vector<std::string>::iterator it = SeedOutFile.begin(),
-                                            ie = SeedOutFile.end();
-         it != ie; ++it) {
-      SeedStruct out = seedInfoFromFile(it->c_str());
-        if (!out.ktest) {
-          klee_error("unable to open: %s\n", (*it).c_str());
-        }
-        seeds.push_back(out);
-    }
-    for (std::vector<std::string>::iterator it = SeedOutDir.begin(),
-                                            ie = SeedOutDir.end();
-         it != ie; ++it) {
-      std::vector<std::string> kTestFiles;
-      KleeHandler::getKTestFilesInDir(*it, kTestFiles);
-      for (std::vector<std::string>::iterator it2 = kTestFiles.begin(),
-                                              ie = kTestFiles.end();
-           it2 != ie; ++it2) {
-        SeedStruct out = seedInfoFromFile(it2->c_str());
-        if (!out.ktest) {
-          klee_error("unable to open: %s\n", (*it2).c_str());
-        }
-        seeds.push_back(out);
-      }
-      if (kTestFiles.empty()) {
-        klee_error("seeds directory is empty: %s\n", (*it).c_str());
-      }
-    }
-
-    if (!seeds.empty()) {
-      klee_message("KLEE: using %lu seeds\n", seeds.size());
-      interpreter->useSeeds(&seeds);
-    }
     if (RunInDir != "") {
       int res = chdir(RunInDir.c_str());
       if (res < 0) {
@@ -1621,11 +1632,6 @@ static int run_klee_on_function(int pArgc, char **pArgv, char **pEnvp,
     }
 
     interpreter->runFunctionAsMain(mainFn, pArgc, pArgv, pEnvp);
-
-    while (!seeds.empty()) {
-      kTest_free(seeds.back().ktest);
-      seeds.pop_back();
-    }
   }
 
   auto endTime = std::time(nullptr);

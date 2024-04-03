@@ -22,6 +22,8 @@
 
 using namespace klee;
 
+void SeedInfo::KTestDeleter(KTest * kTest) { kTest_free(kTest); }
+
 KTestObject *SeedInfo::getNextInput(const MemoryObject *mo, bool byName) {
   if (byName) {
     unsigned i;

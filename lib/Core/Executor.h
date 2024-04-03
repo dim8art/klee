@@ -203,10 +203,6 @@ private:
   /// object.
   unsigned replayPosition;
 
-  /// When non-null a list of "seed" inputs which will be used to
-  /// drive execution.
-  const std::vector<SeedStruct> *usingSeeds;
-
   /// Disables forking, instead a random path is chosen. Enabled as
   /// needed to control memory usage. \see fork()
   bool atMemoryLimit;
@@ -267,7 +263,7 @@ private:
   void targetedRun(ExecutionState &initialState, KBlock *target,
                    ExecutionState **resultState = nullptr);
 
-  void seed(ExecutionState &initialState);
+  void initialSeed(ExecutionState &initialState);
   void run(ExecutionState *initialState);
   void runWithTarget(ExecutionState &state, KFunction *kf, KBlock *target);
 
@@ -749,10 +745,6 @@ public:
       std::set<std::string> &&mainModuleGlobals, FLCtoOpcode &&origInstructions,
       const std::set<std::string> &ignoredExternals,
       std::vector<std::pair<std::string, std::string>> redefinitions) override;
-
-  void useSeeds(const std::vector<SeedStruct> *seeds) override {
-    usingSeeds = seeds;
-  }
 
   ExecutionState *formState(llvm::Function *f);
   ExecutionState *formState(llvm::Function *f, int argc, char **argv,
