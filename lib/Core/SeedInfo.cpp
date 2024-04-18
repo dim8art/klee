@@ -19,10 +19,21 @@
 #include "klee/Support/ErrorHandling.h"
 
 #include <set>
+#include <fstream>
 
 using namespace klee;
 
 void SeedInfo::KTestDeleter(KTest * kTest) { kTest_free(kTest); }
+
+SeedInfo::SeedInfo(std::string _path)
+    : input(kTest_fromFile((_path + "ktest").c_str()), KTestDeleter),
+      path(_path) {
+  std::ifstream seedInfoStream(_path + "seedinfo");
+  if (seedInfoStream.good()) {
+    seedInfoStream >> maxInstructions;
+    seedInfoStream >> isCompleted;
+  }
+}
 
 KTestObject *SeedInfo::getNextInput(const MemoryObject *mo, bool byName) {
   if (byName) {

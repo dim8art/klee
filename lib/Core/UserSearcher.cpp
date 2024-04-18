@@ -197,10 +197,9 @@ Searcher *klee::constructUserSearcher(Executor &executor,
   }
 
   if (UseSeededSearch) {
-    std::vector<ExecutionState *> &unseededStates = executor.getUnseededStates();
-    std::vector<ExecutionState *> &seededStates = executor.getSeededStates();
+    states_ty &seedChandes = executor.getSeedChanges();
 
-    searcher = new SeededSearcher(searcher, unseededStates, seededStates);
+    searcher = new SeededSearcher(searcher, seedChandes);
   }
 
   llvm::raw_ostream &os = executor.getHandler().getInfoStream();

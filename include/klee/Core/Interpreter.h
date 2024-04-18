@@ -59,7 +59,6 @@ public:
 
   virtual void processTestCase(const ExecutionState &state, const char *message,
                                const char *suffix, bool isError = false) = 0;
-  virtual std::vector<SeedStruct> uploadNewSeeds() = 0;
   virtual ToolJson info() const = 0;
 };
 

@@ -221,23 +221,6 @@ error:
   return 0;
 }
 
-struct SeedStruct seedInfoFromFile(const char *path) {
-  std::string seedInfo = std::string(path).substr(0, std::string(path).size() - 5) + "seedinfo";
-  std::ifstream seedInfoStream(seedInfo);
-  SeedStruct seed;
-  if (seedInfoStream.good()) {
-    seedInfoStream >> seed.instructions;
-    seedInfoStream >> seed.isCompleted;
-    if(seed.isCompleted){
-      return seed; //cringe
-    }
-  }
-  strcpy(seed.path, path);
-  seed.ktest = kTest_fromFile(path);
-  return seed;
-}//cringe
-
-
 int kTest_toFile(const KTest *bo, const char *path) {
   FILE *f = fopen(path, "wb");
   unsigned i, j;

@@ -312,15 +312,6 @@ cl::opt<std::string> ReplayPathFile("replay-path",
                                     cl::value_desc("path file"),
                                     cl::cat(ReplayCat));
 
-cl::list<std::string> SeedOutFile("seed-file",
-                                  cl::desc(".ktest file to be used as seed"),
-                                  cl::cat(SeedingCat));
-
-cl::list<std::string>
-    SeedOutDir("seed-dir",
-               cl::desc("Directory with .ktest files to be used as seeds"),
-               cl::cat(SeedingCat));
-
 cl::opt<unsigned> MakeConcreteSymbolic(
     "make-concrete-symbolic",
     cl::desc("Probabilistic rate at which to make concrete reads symbolic, "
@@ -432,26 +423,6 @@ class ExecutionState;
 
 /***/
 
-static void getKTestFilesInDir(std::string directoryPath,
-                                     std::vector<std::string> &results) {
-  std::error_code ec;
-  llvm::sys::fs::directory_iterator i(directoryPath, ec), e;
-  for (; i != e && !ec; i.increment(ec)) {
-    auto f = i->path();
-    if (f.size() >= 6 && f.substr(f.size() - 6, f.size()) == ".ktest") {
-      results.push_back(f);
-    }
-  }
-
-  if (ec) {
-    llvm::errs() << "ERROR: unable to read output directory: " << directoryPath
-                 << ": " << ec.message() << "\n";
-    exit(1);
-  }
-}
-
-/***/
-
 class KleeHandler : public InterpreterHandler {
 private:
   Interpreter *m_interpreter;
@@ -508,44 +479,6 @@ public:
 
   ToolJson info() const override;
 
-  std::vector<SeedStruct> uploadNewSeeds() {
-    std::vector<SeedStruct> seeds;
-    for (std::vector<std::string>::iterator it = SeedOutFile.begin(),
-                                            ie = SeedOutFile.end();
-         it != ie; ++it) {
-      SeedStruct out = seedInfoFromFile(it->c_str());
-      if (!out.ktest) {
-        if(!out.isCompleted){
-          klee_error("unable to open: %s\n", (*it).c_str());
-        }
-      } else {
-        seeds.push_back(out);
-      }
-    }
-    for (std::vector<std::string>::iterator it = SeedOutDir.begin(),
-                                            ie = SeedOutDir.end();
-         it != ie; ++it) {
-      std::vector<std::string> kTestFiles;
-      getKTestFilesInDir(*it, kTestFiles);
-      for (std::vector<std::string>::iterator it2 = kTestFiles.begin(),
-                                              ie = kTestFiles.end();
-           it2 != ie; ++it2) {
-        SeedStruct out = seedInfoFromFile(it2->c_str());
-        if (!out.ktest) {
-          klee_error("unable to open: %s\n", (*it2).c_str());
-        } else {
-          seeds.push_back(out);
-        }
-      }
-      if (kTestFiles.empty()) {
-        llvm::errs() << "seeds directory is empty: " << (*it).c_str() << "\n";
-      }
-    }
-    for(auto i: seeds){
-        llvm::errs()<<i.path;
-    }
-    return seeds;
-  }
 };
 
 KleeHandler::KleeHandler(int argc, char **argv)

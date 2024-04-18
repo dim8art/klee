@@ -31,18 +31,22 @@ public:
   std::shared_ptr<KTest> input;
   unsigned maxInstructions = 0;
   bool isCompleted = 0;
-  unsigned inputPosition;
+  unsigned inputPosition = 0;
   std::set<struct KTestObject *> used;
+  std::string path;
 
 public:
   static void KTestDeleter(KTest *kTest);
 
   ~SeedInfo(){}
   
+
   explicit SeedInfo(KTest *input, unsigned maxInstructions, bool isCompleted)
       : input(input, KTestDeleter), maxInstructions(maxInstructions),
         isCompleted(isCompleted), inputPosition(0) {
   }
+
+  SeedInfo(std::string _path);
 
   KTestObject *getNextInput(const MemoryObject *mo, bool byName);
 

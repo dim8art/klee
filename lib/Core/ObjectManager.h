@@ -54,7 +54,8 @@ public:
   void addProcessForest(PForest *);
 
   void addInitialState(ExecutionState *state);
-
+  void addFirstState(ExecutionState *state);
+  
   void setCurrentState(ExecutionState *_current);
 
   ExecutionState *branchState(ExecutionState *state, BranchType reason);
@@ -63,20 +64,19 @@ public:
   void unseed(ExecutionState *state) {
     if(state->isSeeded) {
       state->isSeeded = false;
-      unseededStates.push_back(state);
+      seedChanges.insert(state);
+      statesUpdated = true;
     }
   }
   void seed(ExecutionState *state) {
     if(!state->isSeeded) {
       state->isSeeded = true;
-      seededStates.push_back(state);
+      seedChanges.insert(state);
+      statesUpdated = true;
     }
   }
-  std::vector<ExecutionState *> &getUnseededStates(){
-    return unseededStates; 
-  }
-  std::vector<ExecutionState *> &getSeededStates(){
-     return seededStates; 
+  states_ty &getSeedChanges(){
+    return seedChanges; 
   }
 
   ExecutionState *initializeState(KInstruction *location,
@@ -103,8 +103,7 @@ public:
   std::vector<ExecutionState *> addedStates;
   std::vector<ExecutionState *> removedStates;
 
-  std::vector<ExecutionState *> unseededStates;
-  std::vector<ExecutionState *> seededStates;
+  states_ty seedChanges;
 };
 
 class Subscriber {

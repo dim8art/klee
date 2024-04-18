@@ -162,11 +162,8 @@ private:
 
   ExprHashMap<std::pair<ref<Expr>, llvm::Type *>> constantGepExprBases;
 
-  std::vector<ExecutionState *> &getUnseededStates(){
-    return objectManager->getUnseededStates();
-  }
-  std::vector<ExecutionState *> &getSeededStates(){
-    return objectManager->getSeededStates();
+  states_ty &getSeedChanges(){
+    return objectManager->getSeedChanges();
   }
 
   /// When non-empty the Executor is running in "seed" mode. The
@@ -263,7 +260,11 @@ private:
   void targetedRun(ExecutionState &initialState, KBlock *target,
                    ExecutionState **resultState = nullptr);
 
-  void initialSeed(ExecutionState &initialState);
+  void getKTestFilesInDir(std::string directoryPath,
+                                     std::vector<std::string> &results);
+  std::vector<SeedInfo> uploadNewSeeds();
+  void initialSeed(ExecutionState &initialState, unsigned SeedsToUpload = 0);
+
   void run(ExecutionState *initialState);
   void runWithTarget(ExecutionState &state, KFunction *kf, KBlock *target);
 
@@ -690,7 +691,10 @@ private:
   /// check memory usage and terminate states when over threshold of -max-memory
   /// + 100MB \return true if below threshold, false otherwise (states were
   /// terminated)
-  bool checkMemoryUsage();
+
+  enum MemoryUsage { None, Low, High, Full };
+
+  MemoryUsage checkMemoryUsage();
 
   /// check if branching/forking into N branches is allowed
   bool branchingPermitted(ExecutionState &state, unsigned N);

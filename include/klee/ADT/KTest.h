@@ -58,15 +58,6 @@ int kTest_isKTestFile(const char *path);
 /* returns NULL on (unspecified) error */
 KTest *kTest_fromFile(const char *path);
 
-struct SeedStruct {
-  KTest * ktest;
-  unsigned instructions;
-  unsigned isCompleted; 
-  char *path;
-};
-
-struct SeedStruct seedInfoFromFile(const char *path);
-
 /* returns 1 on success, 0 on (unspecified) error */
 int kTest_toFile(const KTest *, const char *path);
 

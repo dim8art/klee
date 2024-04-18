@@ -398,6 +398,17 @@ cl::opt<std::string>
                       "search (default=0s (off))"),
              cl::cat(SeedingCat));
 
+
+cl::list<std::string> SeedOutFile("seed-file",
+                                  cl::desc(".ktest file to be used as seed"),
+                                  cl::cat(SeedingCat));
+
+cl::list<std::string>
+    SeedOutDir("seed-dir",
+               cl::desc("Directory with .ktest files to be used as seeds"),
+               cl::cat(SeedingCat));
+/***/
+
 /*** Debugging options ***/
 
 /// The different query logging solvers that can switched on/off
@@ -1094,7 +1105,7 @@ void Executor::initializeGlobalObjects(ExecutionState &state) {
 
 bool Executor::branchingPermitted(ExecutionState &state, unsigned N) {
   assert(N);
-  if ((MaxMemoryInhibit && atMemoryLimit) || state.forkDisabled ||
+  if (/*(MaxMemoryInhibit && atMemoryLimit) || */state.forkDisabled ||
       inhibitForking || (MaxForks != ~0u && stats::forks >= MaxForks)) {
 
     if (MaxMemoryInhibit && atMemoryLimit)
@@ -1156,7 +1167,7 @@ void Executor::branch(ExecutionState &state,
   if (it != seedMap->end()) {
     std::vector<SeedInfo> seeds = it->second;
     seedMap->erase(it);
-
+    objectManager->unseed(it->first);
     // Assume each seed only satisfies one condition (necessarily true
     // when conditions are mutually exclusive and their conjunction is
     // a tautology).
@@ -1182,7 +1193,7 @@ void Executor::branch(ExecutionState &state,
 
       // Extra check in case we're replaying seeds with a max-fork
       if (result[i]) {
-        result[i]->isSeeded = true;
+        objectManager->seed(result[i]);
         seedMap->at(result[i]).push_back(*siit);
       }
     }
@@ -1303,7 +1314,6 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
 
   std::vector<SeedInfo> trueSeeds;
   std::vector<SeedInfo> falseSeeds;
-  bool allSeedsCompleted = true;
   time::Span timeout = coreSolverTimeout;
   bool shouldCheckTrueBlock = true, shouldCheckFalseBlock = true;
 
@@ -1334,9 +1344,6 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
       if (siit->maxInstructions &&
           siit->maxInstructions < current.steppedInstructions) {
         continue;
-      }
-      if (!siit->isCompleted) {
-        allSeedsCompleted = false;
       }
       ref<ConstantExpr> result;
       bool success = solver->getValue(current.constraints.cs(),
@@ -4218,9 +4225,9 @@ void Executor::bindModuleConstants(llvm::APFloat::roundingMode rm) {
   }
 }
 
-bool Executor::checkMemoryUsage() {
+Executor::MemoryUsage Executor::checkMemoryUsage() {
   if (!MaxMemory)
-    return true;
+    return None;
 
   // We need to avoid calling GetTotalMallocUsage() often because it
   // is O(elts on freelist). This is really bad since we start
@@ -4229,7 +4236,7 @@ bool Executor::checkMemoryUsage() {
   if ((stats::instructions & 0xFFFFU) != 0 &&
       maxNewWriteableOSSize < OSCopySizeMemoryCheckThreshold &&
       maxNewStateStackSize < StackCopySizeMemoryCheckThreshold)
-    return true;
+    return None;
 
   // check memory limit
   const auto mallocUsage = util::GetTotalMallocUsage() >> 20U;
@@ -4242,14 +4249,20 @@ bool Executor::checkMemoryUsage() {
                       totalUsage);
     coverOnTheFly = true;
   }
-
+  
   atMemoryLimit = totalUsage > MaxMemory; // inhibit forking
   if (!atMemoryLimit)
-    return true;
+  {
+    if(totalUsage < MaxMemory * 0.8){
+      return Executor::Low;
+    } else {
+      return Executor::High;
+    }
+  }
 
   // only terminate states when threshold (+100MB) exceeded
-  if (totalUsage <= MaxMemory + 100)
-    return true;
+  if (totalUsage <= MaxMemory + 10)
+    return Executor::High;
 
   // just guess at how many to kill
   auto states = objectManager->getStates();
@@ -4273,7 +4286,7 @@ bool Executor::checkMemoryUsage() {
                         StateTerminationType::OutOfMemory);
   }
 
-  return false;
+  return Executor::Full;
 }
 
 void Executor::decreaseConfidenceFromStoppedStates(
@@ -4339,27 +4352,80 @@ const KFunction *Executor::getKFunction(const llvm::Function *f) const {
   return (kfIt == kmodule->functionMap.end()) ? nullptr : kfIt->second;
 }
 
-void Executor::initialSeed(ExecutionState &initialState) {
-  std::vector<SeedStruct> usingSeeds = interpreterHandler->uploadNewSeeds();
+void Executor::getKTestFilesInDir(std::string directoryPath,
+                                     std::vector<std::string> &results) {
+  std::error_code ec;
+  llvm::sys::fs::directory_iterator i(directoryPath, ec), e;
+  for (; i != e && !ec; i.increment(ec)) {
+    auto f = i->path();
+    if (f.size() >= 6 && f.substr(f.size() - 6, f.size()) == ".ktest") {
+      results.push_back(f);
+    }
+  }
+
+  if (ec) {
+    llvm::errs() << "ERROR: unable to read output directory: " << directoryPath
+                 << ": " << ec.message() << "\n";
+    exit(1);
+  }
+}
+
+std::vector<SeedInfo> Executor::uploadNewSeeds() {
+  std::vector<SeedInfo> seeds;
+  for (std::vector<std::string>::iterator it = SeedOutFile.begin(),
+                                          ie = SeedOutFile.end();
+       it != ie; ++it) {
+    SeedInfo out(it->substr(0, it->size() - 5));
+    if (!out.input) {
+      klee_error("unable to open: %s\n", (*it).c_str());
+    } else  if (!out.isCompleted) {
+      seeds.push_back(out);
+    }
+  }
+  for (std::vector<std::string>::iterator it = SeedOutDir.begin(),
+                                          ie = SeedOutDir.end();
+       it != ie; ++it) {
+    std::vector<std::string> kTestFiles;
+    getKTestFilesInDir(*it, kTestFiles);
+    for (std::vector<std::string>::iterator it2 = kTestFiles.begin(),
+                                            ie = kTestFiles.end();
+         it2 != ie; ++it2) {
+      SeedInfo out(it2->substr(0, it2->size() - 5));
+      if (!out.input) {
+        klee_error("unable to open: %s\n", (*it2).c_str());
+      } else if (!PruneAlreadyExecutedStates || !out.isCompleted) {
+        seeds.push_back(out);
+      }
+    }
+    if (kTestFiles.empty()) {
+      llvm::errs() << "seeds directory is empty: " << (*it).c_str() << "\n";
+    }
+  }
+  return seeds;
+}
+
+void Executor::initialSeed(ExecutionState &initialState, unsigned seedsToUpload) {
+  std::vector<SeedInfo> usingSeeds = uploadNewSeeds();
   if(usingSeeds.empty()){
     return;
   }
   std::vector<SeedInfo> &v = seedMap->at(&initialState);
-  for (std::vector<SeedStruct>::const_iterator it = usingSeeds.begin(),
+  for (std::vector<SeedInfo>::const_iterator it = usingSeeds.begin(),
                                                ie = usingSeeds.end();
-       it != ie; ++it) {
+       it != ie && (!seedsToUpload || v.size() < seedsToUpload); ++it) {
     if (!(it->isCompleted && PruneAlreadyExecutedStates)) {
-      v.push_back(SeedInfo(it->ktest, it->instructions, it->isCompleted));
+      v.push_back(*it);
     } 
     if(RunForever){
-      llvm::errs()<<"deleting seed\n" << (std::string(it->path) + "ktest").c_str() << "\n";
-      std::remove((std::string(it->path) + "seedinfo").c_str());
-      std::remove((std::string(it->path) + "path").c_str());
-      std::remove((std::string(it->path) + "early").c_str());
-      std::remove((std::string(it->path) + "ktest").c_str());
+      std::remove((it->path + "seedinfo").c_str());
+      std::remove((it->path + "path").c_str());
+      std::remove((it->path + "early").c_str());
+      std::remove((it->path + "ktest").c_str());
     }
   }
+  klee_message("Seeding began using %d seeds!\n" , usingSeeds.size());
   objectManager->seed(&initialState);
+  objectManager->updateSubscribers();
 }
 
 void Executor::reportProgressTowardsTargets(std::string prefix,
@@ -4431,21 +4497,38 @@ void Executor::run(ExecutionState *initialState) {
 
   objectManager->addSubscriber(searcher.get());
 
+  ExecutionState *firstState =
+      objectManager->branchState(initialState, BranchType::InitialBranch);
+
   objectManager->initialUpdate();
 
-  initialSeed(*initialState);
-
+  initialSeed(*firstState);
+  int cnt = 0;
   // main interpreter loop
   while (!haltExecution && !searcher->empty()) {
+
     auto action = searcher->selectAction();
     executeAction(action);
+    searcher->empty();
     objectManager->updateSubscribers();
-
-    if (!checkMemoryUsage()) {
-      if (RunForever) {
-        initialSeed(*initialState);
+    searcher->empty();
+    MemoryUsage usage =checkMemoryUsage();
+    searcher->empty();
+    if (usage != Full) {
+      searcher->empty();
+      if (RunForever && usage == Low) {
+        searcher->empty();
+        ExecutionState *newSeededState =
+            objectManager->branchState(initialState, BranchType::InitialBranch);
+        initialSeed(*newSeededState, 1000);
       }
+      searcher->empty();
       objectManager->updateSubscribers();
+    }
+    if (searcher->empty()) {
+      ExecutionState *newSeededState =
+          objectManager->branchState(initialState, BranchType::InitialBranch);
+      initialSeed(*newSeededState, 1000);
     }
   }
 
@@ -4555,9 +4638,8 @@ bool Executor::reachedMaxSeedInstructions(ExecutionState *state){
       siit->maxInstructions >= state->steppedInstructions) {
     objectManager->unseed(state);
     seedMap->erase(state);
-   // llvm::errs() << "Seeded paths remaining: " << seedMap->size() << "\n";
     if(seedMap->size() == 0){
-      llvm::errs() << "Seeding done!\n";
+      klee_message("Seeding done!\n");
     }
     return true;
   }
@@ -4739,6 +4821,10 @@ HaltExecution::Reason fromStateTerminationType(StateTerminationType t) {
 
 void Executor::terminateState(ExecutionState &state,
                               StateTerminationType terminationType) {
+  if(seedMap->find(&state) != seedMap->end()){
+    objectManager->unseed(&state);
+    seedMap->erase(&state);
+  }
   state.terminationReasonType = fromStateTerminationType(terminationType);
   if (terminationType >= StateTerminationType::MaxDepth &&
       terminationType <= StateTerminationType::EARLY) {
