@@ -65,8 +65,8 @@ int kTest_toFile(const KTest *, const char *path);
 unsigned kTest_numBytes(KTest *);
 
 void kTest_free(KTest *);
-void test_kTest_free(KTest *);
 
+unsigned getkTestMemoryUsage(KTest *ktest);
 #ifdef __cplusplus
 }
 #endif

@@ -171,7 +171,7 @@ private:
   /// on as-yet-to-be-determined flags.
   std::unique_ptr<SeedMap> seedMap;
 
-  std::unique_ptr<std::deque<StoredSeed>> storedSeeds;
+  std::unique_ptr<std::deque<ExecutingSeed>> storedSeeds;
 
   /// Map of globals to their representative memory object.
   std::map<const llvm::GlobalValue *, MemoryObject *> globalObjects;
@@ -266,7 +266,7 @@ private:
   std::vector<ExecutingSeed> uploadNewSeeds();
   void initialSeed(ExecutionState &initialState);
 
-  StoredSeed storeState(const ExecutionState &state);
+  ExecutingSeed storeState(const ExecutionState &state);
 
   void run(ExecutionState *initialState);
 

@@ -700,7 +700,7 @@ void KleeHandler::processTestCase(const ExecutionState &state,
         m_interpreter->getHaltExecution() ==
             HaltExecution::Reason::UnreachedTarget))) {
     KTest *ktest = 0;
-    ktest = new KTest;
+    ktest = (KTest *)calloc(1, sizeof(*ktest));
     bool isCompleted = message == nullptr;
     bool success = m_interpreter->getSymbolicSolution(state, ktest);
 
@@ -747,7 +747,7 @@ void KleeHandler::processTestCase(const ExecutionState &state,
         }
       }
 
-      test_kTest_free(ktest);
+      kTest_free(ktest);
     } else {
       delete ktest;
     }

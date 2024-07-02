@@ -24,12 +24,10 @@
 
 using namespace klee;
 
-void KTestDeleter::kTestDeleter(KTest *kTest) { kTest_free(kTest); }
-void KTestDeleter::testKTestDeleter(KTest *kTest) { test_kTest_free(kTest); }
+void ExecutingSeed::kTestDeleter(KTest *kTest) { kTest_free(kTest); }
 
 ExecutingSeed::ExecutingSeed(std::string _path)
-    : input(kTest_fromFile((_path + "ktest").c_str()),
-            KTestDeleter::kTestDeleter),
+    : input(kTest_fromFile((_path + "ktest").c_str()), kTestDeleter),
       path(_path) {
   std::ifstream seedInfoStream(_path + "seedinfo");
   if (seedInfoStream.good()) {
@@ -37,10 +35,6 @@ ExecutingSeed::ExecutingSeed(std::string _path)
     seedInfoStream >> isCompleted;
   }
 }
-
-ExecutingSeed::ExecutingSeed(StoredSeed seed)
-    : input(seed.output), maxInstructions(seed.steppedInstructions),
-      isCompleted(seed.isCompleted), inputPosition(0) {}
 
 KTestObject *ExecutingSeed::getNextInput(const MemoryObject *mo, bool byName) {
   if (byName) {

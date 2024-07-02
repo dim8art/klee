@@ -299,13 +299,11 @@ void kTest_free(KTest *bo) {
   free(bo);
 }
 
-void test_kTest_free(KTest *bo) {
-  unsigned i;
-  for (i = 0; i < bo->numObjects; i++) {
-    free(bo->objects[i].name);
-    free(bo->objects[i].bytes);
-    free(bo->objects[i].pointers);
+unsigned getkTestMemoryUsage(KTest *ktest) {
+  size_t size = 0;
+  for (unsigned i = 0; i < ktest->numObjects; i++) {
+    size += strlen(ktest->objects[i].name) * sizeof(char);
+    size += ktest->objects[i].numBytes * sizeof(unsigned char);
+    size += ktest->objects[i].numPointers * sizeof(Pointer);
   }
-  free(bo->objects);
-  free(bo);
 }

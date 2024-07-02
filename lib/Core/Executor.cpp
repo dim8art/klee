@@ -559,7 +559,7 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
 
   objectManager = std::make_unique<ObjectManager>();
   seedMap = std::make_unique<SeedMap>();
-  storedSeeds = std::make_unique<std::deque<StoredSeed>>();
+  storedSeeds = std::make_unique<std::deque<ExecutingSeed>>();
   objectManager->addSubscriber(seedMap.get());
 
   // Add first entry for single run
@@ -1222,6 +1222,10 @@ void Executor::branch(ExecutionState &state,
     for (std::vector<ExecutingSeed>::iterator siit = seeds.begin(),
                                               siie = seeds.end();
          siit != siie; ++siit) {
+      if (siit->maxInstructions &&
+          siit->maxInstructions < state.steppedInstructions) {
+        continue;
+      }
       unsigned i;
       for (i = 0; i < N; ++i) {
         ref<ConstantExpr> res;
@@ -4537,7 +4541,7 @@ std::vector<ExecutingSeed> Executor::uploadNewSeeds() {
   if (StoreSeedsLocally) {
     while ((!UploadAmount || seeds.size() < UploadAmount) &&
            !storedSeeds->empty()) {
-      seeds.push_back(ExecutingSeed(storedSeeds->front()));
+      seeds.push_back(storedSeeds->front());
       storedSeeds->pop_front();
     }
   }
@@ -4606,20 +4610,13 @@ void Executor::initialSeed(ExecutionState &initialState) {
   objectManager->updateSubscribers();
 }
 
-StoredSeed Executor::storeState(const ExecutionState &state) {
+ExecutingSeed Executor::storeState(const ExecutionState &state) {
   KTest *ktest = 0;
-  ktest = new KTest;
+  ktest = (KTest *)calloc(1, sizeof(*ktest));
   bool success = getSymbolicSolution(state, ktest);
-  size_t size = 0;
-  for (unsigned i = 0; i < ktest->numObjects; i++) {
-    size += std::strlen(ktest->objects[i].name) * sizeof(char);
-    size += ktest->objects[i].numBytes * sizeof(unsigned char);
-    size += ktest->objects[i].numPointers * sizeof(Pointer);
-  }
-  llvm::errs() << size << "\n";
   if (!success)
     klee_warning("unable to get symbolic solution, losing test case");
-  StoredSeed seed(ktest, state.steppedInstructions, 0);
+  ExecutingSeed seed(ktest, state.steppedInstructions, 0);
   return seed;
 }
 
@@ -4808,6 +4805,10 @@ bool Executor::reachedMaxSeedInstructions(ExecutionState *state) {
     objectManager->unseed(state);
     if (seedMap->size() == 0) {
       klee_message("Seeding done!\n");
+    }
+    if(OnlyReplaySeeds){
+      terminateStateEarlyAlgorithm(*state, "Unseeded path during replay",
+                                     StateTerminationType::Replay);
     }
     return true;
   }
@@ -7675,7 +7676,12 @@ bool Executor::getSymbolicSolution(const ExecutionState &state, KTest *res) {
   }
 
   res->numArgs = interpreterHandler->argc();
-  res->args = interpreterHandler->argv();
+  res->args = (char **)calloc(res->numArgs+1, sizeof(*res->args));
+  for (unsigned i = 0; i < res->numArgs; i++) {
+    unsigned argsize = std::strlen(interpreterHandler->argv()[i]);
+    res->args[i] = (char *)calloc(argsize + 1, sizeof(*res->args[i]));
+    std::strcpy(res->args[i], interpreterHandler->argv()[i]);
+  }
   res->symArgvs = 0;
   res->symArgvLen = 0;
   res->numObjects = symbolics.size();

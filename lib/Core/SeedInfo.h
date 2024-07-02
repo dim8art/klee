@@ -24,26 +24,6 @@ class ExecutionState;
 class TimingSolver;
 class MemoryObject;
 
-struct KTestDeleter {
-  static void kTestDeleter(KTest *kTest);
-  static void testKTestDeleter(KTest *kTest);
-};
-
-class StoredSeed {
-public:
-  std::shared_ptr<KTest> output;
-  unsigned steppedInstructions;
-  bool isCompleted;
-
-public:
-  ~StoredSeed() {}
-
-  explicit StoredSeed(KTest *output, unsigned steppedInstructions,
-                      bool isCompleted)
-      : output(output, KTestDeleter::testKTestDeleter),
-        steppedInstructions(steppedInstructions), isCompleted(isCompleted) {}
-};
-
 class ExecutingSeed {
 public:
   Assignment assignment;
@@ -59,13 +39,13 @@ public:
 
   explicit ExecutingSeed(KTest *input, unsigned maxInstructions,
                          bool isCompleted)
-      : input(input, KTestDeleter::testKTestDeleter),
-        maxInstructions(maxInstructions), isCompleted(isCompleted),
-        inputPosition(0) {}
-  ExecutingSeed(StoredSeed seed);
+      : input(input, kTestDeleter), maxInstructions(maxInstructions),
+        isCompleted(isCompleted), inputPosition(0) {}
   ExecutingSeed(std::string _path);
 
   KTestObject *getNextInput(const MemoryObject *mo, bool byName);
+
+  static void kTestDeleter(KTest *kTest);
 
   /// Patch the seed so that condition is satisfied while retaining as
   /// many of the seed values as possible.
