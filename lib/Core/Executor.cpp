@@ -7676,7 +7676,7 @@ bool Executor::getSymbolicSolution(const ExecutionState &state, KTest *res) {
   }
 
   res->numArgs = interpreterHandler->argc();
-  res->args = (char **)calloc(res->numArgs+1, sizeof(*res->args));
+  res->args = (char **)calloc(res->numArgs, sizeof(*res->args));
   for (unsigned i = 0; i < res->numArgs; i++) {
     unsigned argsize = std::strlen(interpreterHandler->argv()[i]);
     res->args[i] = (char *)calloc(argsize + 1, sizeof(*res->args[i]));
