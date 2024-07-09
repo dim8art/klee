@@ -1206,10 +1206,6 @@ void Executor::branch(ExecutionState &state,
     }
   }
 
-  // If necessary redistribute seeds to match conditions, killing
-  // states if necessary due to OnlyReplaySeeds (inefficient but
-  // simple).
-
   std::map<ExecutionState *, std::vector<ExecutingSeed>>::iterator it =
       seedMap->find(&state);
   if (it != seedMap->end()) {
@@ -4805,10 +4801,6 @@ bool Executor::reachedMaxSeedInstructions(ExecutionState *state) {
     objectManager->unseed(state);
     if (seedMap->size() == 0) {
       klee_message("Seeding done!\n");
-    }
-    if(OnlyReplaySeeds){
-      terminateStateEarlyAlgorithm(*state, "Unseeded path during replay",
-                                     StateTerminationType::Replay);
     }
     return true;
   }
