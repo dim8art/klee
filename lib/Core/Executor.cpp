@@ -7442,7 +7442,8 @@ void Executor::setInitializationGraph(
   }
   for (auto i : pointers) {
     ktest.objects[i.first].numPointers = i.second.size();
-    ktest.objects[i.first].pointers = new Pointer[i.second.size()];
+    ktest.objects[i.first].pointers = (Pointer *)calloc(
+        i.second.size(), sizeof(*ktest.objects[i.first].pointers));
     for (size_t j = 0; j < i.second.size(); j++) {
       ktest.objects[i.first].pointers[j] = i.second[j];
     }
