@@ -7102,8 +7102,8 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     state->symPathOS = symPathOS;
 
   run(state);
-  delete state;
-
+  objectManager->removeInitialState(state);
+  
   if (statsTracker)
     statsTracker->done();
 

@@ -54,6 +54,7 @@ public:
   void addProcessForest(PForest *);
 
   void addInitialState(ExecutionState *state);
+  void removeInitialState(ExecutionState *state);  
   void addFirstState(ExecutionState *state);
 
   void setCurrentState(ExecutionState *_current);

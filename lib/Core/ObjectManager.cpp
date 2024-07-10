@@ -26,6 +26,11 @@ void ObjectManager::addInitialState(ExecutionState *state) {
   processForest->addRoot(state);
 }
 
+void ObjectManager::removeInitialState(ExecutionState *state) {
+  processForest->remove(state->ptreeNode);
+  delete state;
+}
+
 void ObjectManager::addFirstState(ExecutionState *state) {
   states.insert(state);
 }
