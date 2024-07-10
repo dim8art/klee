@@ -4951,7 +4951,6 @@ void Executor::terminateState(ExecutionState &state,
                               StateTerminationType terminationType) {
   if (seedMap->find(&state) != seedMap->end()) {
     seedMap->erase(&state);
-    objectManager->unseed(&state);
   }
   state.terminationReasonType = fromStateTerminationType(terminationType);
   if (terminationType >= StateTerminationType::MaxDepth &&
@@ -7103,6 +7102,7 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     state->symPathOS = symPathOS;
 
   run(state);
+  delete state;
 
   if (statsTracker)
     statsTracker->done();

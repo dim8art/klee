@@ -9,13 +9,11 @@
 
 #include "klee/ADT/KTest.h"
 
-#include <cassert>
 #include <fstream>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <string>
 
 #define KTEST_VERSION 4
 #define KTEST_MAGIC_SIZE 5
@@ -306,4 +304,5 @@ unsigned getkTestMemoryUsage(KTest *ktest) {
     size += ktest->objects[i].numBytes * sizeof(unsigned char);
     size += ktest->objects[i].numPointers * sizeof(Pointer);
   }
+  return size;
 }

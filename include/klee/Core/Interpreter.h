@@ -12,7 +12,6 @@
 #include "TerminationTypes.h"
 #include "klee/Module/Annotation.h"
 
-#include "klee/ADT/KTest.h"
 #include "klee/Module/SarifReport.h"
 
 #include <cstdint>
