@@ -102,7 +102,7 @@ cl::opt<bool> WriteKTests(
     cl::cat(TestCaseCat));
 
 cl::opt<bool> WriteSeeds(
-    "write-seeds", cl::init(false),
+    "write-seeds", cl::init(true),
     cl::desc("Write seed files files for each test case (default=true)"),
     cl::cat(TestCaseCat));
 
