@@ -35,6 +35,7 @@
 #include "klee/ADT/Bits.h"
 #include "klee/ADT/SparseStorage.h"
 #include "klee/Core/Context.h"
+#include "FuzzerExt.h"
 
 #include "klee/ADT/KTest.h"
 #include "klee/Config/Version.h"
@@ -4725,6 +4726,7 @@ void Executor::reportProgressTowardsTargets() const {
 void Executor::run(ExecutionState *initialState) {
   // Delay init till now so that ticks don't accrue during optimization and
   // such.
+  testfuzz();
   if (guidanceKind != GuidanceKind::ErrorGuidance)
     timers.reset();
 

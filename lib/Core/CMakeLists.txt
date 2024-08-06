@@ -47,6 +47,7 @@ target_link_libraries(kleeCore PRIVATE
   kleaverSolver
   kleaverExpr
   kleeSupport
+  kleeFuzzer
 )
 
 llvm_config(kleeCore "${USE_LLVM_SHARED}" core executionengine mcjit native support)

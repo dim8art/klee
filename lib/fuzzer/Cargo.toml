@@ -1,0 +1,27 @@
+[package]
+name = "kleeFuzzer"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+name = "kleeFuzzer"
+
+[features]
+default = ["std"]
+tui = []
+std = []
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[dependencies]
+libafl = { path = "/home/dim8art/klee/LibAFL/libafl/" }
+libafl_bolts = { path = "/home/dim8art/klee/LibAFL/libafl_bolts/" }

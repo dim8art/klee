@@ -34,3 +34,7 @@ autom4te.cache/
 .vscode/
 .cache/
 .helix/
+
+/lib/fuzzer/Cargo.lock
+/lib/fuzzer/target/
+/crashes
