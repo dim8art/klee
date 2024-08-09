@@ -33,28 +33,17 @@ fn signals_set(idx: usize) {
     unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
+pub struct FuzzInfo {
+    pub harness: extern "C" fn()
+}
 
 #[no_mangle]
-pub unsafe extern "C" fn testfuzz() {
+pub unsafe extern "C" fn testfuzz(FuzzInfo fi) {
 // The closure that we want to fuzz
 let mut harness = |input: &BytesInput| {
     let target = input.target_bytes();
     let buf = target.as_slice();
-    signals_set(0);
-    if !buf.is_empty() && buf[0] == b'a' {
-        signals_set(1);
-        if buf.len() > 1 && buf[1] == b'b' {
-            signals_set(2);
-            if buf.len() > 2 && buf[2] == b'c' {
-                #[cfg(unix)]
-                panic!("Artificial bug triggered =)");
-                #[cfg(windows)]
-                unsafe {
-                    write_volatile(0 as *mut u32, 0);
-                }
-            }
-        }
-    }
+    (fi.harness)();
     ExitKind::Ok
 };
 
@@ -123,7 +112,7 @@ state
 // Setup a mutational stage with a basic bytes mutator
 let mutator = StdScheduledMutator::new(havoc_mutations());
 let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-for _x in 1..100 {
+for _x in 1..2 {
 fuzzer
     .fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)
     .expect("Error in the fuzzing loop");

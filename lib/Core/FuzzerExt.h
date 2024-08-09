@@ -1,5 +1,8 @@
 #include <cstdint>
 
 extern "C" {
-    void testfuzz();
+    struct FuzzInfo {
+        void(*harness)();
+    };
+    void testfuzz(FuzzInfo fi);
 }
