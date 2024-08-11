@@ -33,12 +33,13 @@ fn signals_set(idx: usize) {
     unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
+#[repr(C)]
 pub struct FuzzInfo {
     pub harness: extern "C" fn()
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn testfuzz(FuzzInfo fi) {
+pub unsafe extern "C" fn fuzzInternal(fi : FuzzInfo) {
 // The closure that we want to fuzz
 let mut harness = |input: &BytesInput| {
     let target = input.target_bytes();

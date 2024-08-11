@@ -254,6 +254,7 @@ public:
 
   virtual void getBlockPath(const ExecutionState &state,
                             std::string &blockPath) = 0;
+  virtual void tryFuzzer(llvm::Module *m) = 0;
 };
 
 } // namespace klee

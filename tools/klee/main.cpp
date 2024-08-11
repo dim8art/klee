@@ -1470,6 +1470,7 @@ static int run_klee_on_function(int pArgc, char **pArgv, char **pEnvp,
                                 llvm::Module *finalModule,
                                 llvm::Function *mainFn,
                                 std::vector<bool> &replayPath) {
+  interpreter->tryFuzzer(finalModule);
   if (ReplayPathFile != "") {
     interpreter->setReplayPath(&replayPath);
   }

@@ -20,6 +20,7 @@ add_library(kleeCore
   Executor.cpp
   ExecutorUtil.cpp
   ExternalDispatcher.cpp
+  Fuzzer.cpp
   ImpliedValue.cpp
   Memory.cpp
   MemoryManager.cpp

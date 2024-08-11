@@ -4726,7 +4726,6 @@ void Executor::reportProgressTowardsTargets() const {
 void Executor::run(ExecutionState *initialState) {
   // Delay init till now so that ticks don't accrue during optimization and
   // such.
-  testfuzz();
   if (guidanceKind != GuidanceKind::ErrorGuidance)
     timers.reset();
 

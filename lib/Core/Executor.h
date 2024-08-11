@@ -43,6 +43,8 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "Fuzzer.h"
+
 #include <map>
 #include <memory>
 #include <set>
@@ -868,6 +870,11 @@ public:
 
   /// Returns the errno location in memory of the state
   int *getErrnoLocation() const;
+
+  void tryFuzzer(llvm::Module * m) override {
+    Fuzzer fuzzer(m);
+    fuzzer.fuzz();
+  }
 };
 
 } // namespace klee
