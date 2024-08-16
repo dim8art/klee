@@ -38,7 +38,7 @@ void Fuzzer::initializeEngine() {
     // Make sure we can resolve symbols in the program as well. The zero arg
     // to the function tells DynamicLibrary to load the program, not a
     // library.
-    llvm::sys::DynamicLibrary::LoadLibraryPermanently(0);
+    llvm::sys::DynamicLibrary::LoadLibraryPermanently("/home/dim8art/klee_build/klee_build140bitwuzla_stp_z3Debug/lib/libkleeFuzzerIntrinsics.so"); //fix address
     // InitializeNativeTarget();
     // InitializeNativeTargetAsmPrinter();
     // InitializeNativeTargetAsmParser();
