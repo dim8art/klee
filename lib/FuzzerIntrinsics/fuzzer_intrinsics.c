@@ -21,8 +21,7 @@
 
 #include "klee/ADT/KTest.h"
 
-static uint64_t numValues;
-static uint64_t *values;
+int8_t *bytes; int64_t numBytes = 0; int64_t bytesPosition = 0;
 static KTest *testData = 0;
 static unsigned testPosition = 0;
 static uintptr_t *addresses;
@@ -78,6 +77,11 @@ void recursively_allocate(KTestObject *obj, size_t index, void *addr,
 }
 
 static void klee_make_symbol(void *array, size_t nbytes, const char *name) {
+  int8_t value;
+  for(int64_t i = bytesPosition; i<bytesPosition+nbytes; i++){
+    array[i] = 
+  }
+  bytesPosition += nbytes;
   fprintf(stdout,
               "using klee_make_symbol on var %s\n", name);
 }
@@ -105,6 +109,13 @@ unsigned klee_is_replay() { return 1; }
 void klee_assume(uintptr_t x) {
  fprintf(stdout,
               "using klee_assume on expression %zd\n", x);
+}
+
+void klee_harness(int8_t *_bytes, int64_t _numBytes) {
+  bytes = _bytes;
+  numBytes = _numBytes;
+  bytesPosition = 0;
+  main();
 }
 
 #define KLEE_GET_VALUE_STUB(suffix, type)                                      \
