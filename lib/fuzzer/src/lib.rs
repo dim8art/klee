@@ -113,10 +113,10 @@ state
 // Setup a mutational stage with a basic bytes mutator
 let mutator = StdScheduledMutator::new(havoc_mutations());
 let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-for _x in 1..100 {
+
 fuzzer
-    .fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)
+    .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
     .expect("Error in the fuzzing loop");
-}
+
 }
 

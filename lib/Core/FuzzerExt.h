@@ -5,8 +5,8 @@
 extern "C" {
 
 struct FuzzInfo {
-  void (*harness)(const int8_t *, size_t);
-  FuzzInfo(void (*harness)(const int8_t *, size_t)) : harness(harness) {}
+  void (*harness)(const uint8_t *, size_t);
+  FuzzInfo(void (*harness)(const uint8_t *, size_t)) : harness(harness) {}
 };
 void fuzzInternal(FuzzInfo fi);
 }
