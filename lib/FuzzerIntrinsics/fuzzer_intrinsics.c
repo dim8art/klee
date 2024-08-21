@@ -1,4 +1,5 @@
-//===-- fuzzer_intrinsics.c ------------------------------------------------------===//
+//===-- fuzzer_intrinsics.c
+//------------------------------------------------------===//
 //
 //                     The KLEE Symbolic Virtual Machine
 //
@@ -21,7 +22,9 @@
 
 #include "klee/ADT/KTest.h"
 
-int8_t *bytes; int64_t numBytes = 0; int64_t bytesPosition = 0;
+const int8_t *bytes;
+size_t numBytes = 0;
+size_t bytesPosition = 0;
 static KTest *testData = 0;
 static unsigned testPosition = 0;
 static uintptr_t *addresses;
@@ -77,13 +80,12 @@ void recursively_allocate(KTestObject *obj, size_t index, void *addr,
 }
 
 static void klee_make_symbol(void *array, size_t nbytes, const char *name) {
-  int8_t value;
-  for(int64_t i = bytesPosition; i<bytesPosition+nbytes; i++){
-    array[i] = 
+  int8_t *value = array;
+  for (int64_t i = bytesPosition; i < bytesPosition + nbytes; i++) {
+    value[i] = bytes[i];
   }
   bytesPosition += nbytes;
-  fprintf(stdout,
-              "using klee_make_symbol on var %s\n", name);
+  fprintf(stdout, "using klee_make_symbol on var %s\n", name);
 }
 
 void klee_make_symbolic(void *array, size_t nbytes, const char *name) {
@@ -107,11 +109,10 @@ uintptr_t klee_choose(uintptr_t n) {
 unsigned klee_is_replay() { return 1; }
 
 void klee_assume(uintptr_t x) {
- fprintf(stdout,
-              "using klee_assume on expression %zd\n", x);
+  fprintf(stdout, "using klee_assume on expression %zd\n", x);
 }
 
-void klee_harness(int8_t *_bytes, int64_t _numBytes) {
+void klee_harness(const int8_t *_bytes, size_t _numBytes) {
   bytes = _bytes;
   numBytes = _numBytes;
   bytesPosition = 0;

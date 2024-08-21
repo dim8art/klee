@@ -47,7 +47,7 @@ void Fuzzer::initializeEngine() {
 
 void Fuzzer::fuzz() {
   initializeEngine();
-  uint64_t f = executionEngine->getFunctionAddress("main");
-  FuzzInfo fi((void (*)())f);
+  uint64_t f = executionEngine->getFunctionAddress("harness");
+  FuzzInfo fi((void (*)(const int8_t*, size_t))f);
   fuzzInternal(fi);
 }
