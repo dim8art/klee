@@ -1,4 +1,4 @@
-//===-- fuzzer_intrinsics.c
+//===-- fuzzer_intrinsics.cpp
 //------------------------------------------------------===//
 //
 //                     The KLEE Symbolic Virtual Machine
@@ -8,13 +8,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-/* Straight C for linking simplicity */
 
-#include <assert.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cassert>
+#include <vector>
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <sys/mman.h>
 #include <sys/time.h>
 
@@ -22,12 +22,44 @@
 
 #include "klee/ADT/KTest.h"
 
-const int8_t *bytes;
-size_t numBytes = 0;
-size_t bytesPosition = 0;
-static KTest *testData = 0;
-static unsigned testPosition = 0;
-static uintptr_t *addresses;
+
+const uint8_t *bytes;
+static size_t numBytes = 0;
+static size_t bytesPosition = 0;
+
+struct VarInfo {
+  void *array;
+  size_t nbytes;
+  char *name = nullptr;
+  VarInfo(void *_array, size_t _nbytes, const char *_name) : array(_array), nbytes(_nbytes){
+    name = (char *)calloc(std::strlen(_name) + 1, sizeof(name));
+    std::strcpy(name, _name);
+  }
+};
+
+static std::vector<VarInfo> varEntries;
+
+static bool generateKTest(KTest *res){
+  res = (KTest *)calloc(1, sizeof(*res));
+  res->numObjects = varEntries.size();
+  res->objects = (KTestObject *)calloc(res->numObjects, sizeof(*res->objects));
+  for (unsigned i = 0; i < varEntries.size(); i++) {
+    VarInfo &vi = varEntries[i];
+    KTestObject *o = &res->objects[i];
+    o->name = (char *)calloc(std::strlen(vi.name) + 1, sizeof(*o->name));
+    std::strcpy(o->name, vi.name);
+    o->address = (uint64_t)(vi.array);
+    o->numBytes = vi.nbytes;
+    o->bytes = (unsigned char *)calloc(o->numBytes, sizeof(*o->bytes));
+    uint8_t *value = static_cast<uint8_t *>(vi.array);
+    for (size_t j = 0; j < o->numBytes; j++) {
+      o->bytes[j] = value[j];
+    }
+    o->numPointers = 0;
+    o->pointers = nullptr;
+  }
+  return true;
+}
 
 static unsigned char rand_byte(void) {
   unsigned x = rand();
@@ -56,36 +88,14 @@ static void report_internal_error(const char *msg, ...) {
   }
 }
 
-void recursively_allocate(KTestObject *obj, size_t index, void *addr,
-                          int lazy) {
-  if (!lazy) {
-    memcpy(addr, obj->bytes, obj->numBytes);
-    addresses[index] = (uintptr_t)addr;
-  } else {
-    void *address = malloc(obj->numBytes);
-    memcpy(address, obj->bytes, obj->numBytes);
-    addresses[index] = (uintptr_t)address;
-  }
-  for (size_t i = 0; i < obj->numPointers; i++) {
-    if (!addresses[obj->pointers[i].index]) {
-      recursively_allocate(&testData->objects[obj->pointers[i].index],
-                           obj->pointers[i].index, 0, 1);
-    }
-    void *offset_addr = (void *)(addresses[index] + (obj->pointers[i].offset));
-    void *pointee_addr = (void *)(addresses[obj->pointers[i].index]);
-    pointee_addr += obj->pointers[i].indexOffset;
-    memcpy(offset_addr, &pointee_addr, sizeof(void *));
-  }
-  return;
-}
-
 static void klee_make_symbol(void *array, size_t nbytes, const char *name) {
-  int8_t *value = array;
-  for (int64_t i = bytesPosition; i < bytesPosition + nbytes; i++) {
-    value[i] = bytes[i];
+  fprintf(stdout, "using klee_make_symbol on var %s with value\n", name);
+  uint8_t *value = (uint8_t *)array;
+  for (size_t i = bytesPosition; i < bytesPosition + nbytes; i++) {
+    value[i-bytesPosition] = bytes[i];
   }
   bytesPosition += nbytes;
-  fprintf(stdout, "using klee_make_symbol on var %s\n", name);
+  varEntries.push_back(VarInfo(array, nbytes, name));
 }
 
 void klee_make_symbolic(void *array, size_t nbytes, const char *name) {
@@ -112,12 +122,16 @@ void klee_assume(uintptr_t x) {
   fprintf(stdout, "using klee_assume on expression %zd\n", x);
 }
 
-void klee_harness(const int8_t *_bytes, size_t _numBytes) {
+void klee_harness(const uint8_t *_bytes, size_t _numBytes, uint64_t mainAddr) {
+  printf("klee_harness began\n");
   bytes = _bytes;
   numBytes = _numBytes;
+    printf("%ul\n", numBytes);
   bytesPosition = 0;
-  main();
+  void (*f)() = (void (*)())mainAddr;
+  (*f)();
 }
+
 
 #define KLEE_GET_VALUE_STUB(suffix, type)                                      \
   type klee_get_value##suffix(type x) { return x; }

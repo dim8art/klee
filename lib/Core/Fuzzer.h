@@ -1,10 +1,18 @@
 #ifndef KLEE_FUZZER_H
 #define KLEE_FUZZER_H
 
-  namespace llvm {
-  class ExecutionEngine;
-  class Module;
-  }
+#include <vector>
+#include <cstdint>
+
+namespace llvm {
+class ExecutionEngine;
+class Module;
+} // namespace llvm
+
+extern "C" {
+struct KTest;
+struct KTestObject;
+}
 
 namespace klee {
 
@@ -18,6 +26,8 @@ public:
   void initializeEngine();
 
   void fuzz();
+
+  std::vector<uint8_t> bytesArrayFromKtest(KTest * kTest);
 };
 
 } // namespace klee

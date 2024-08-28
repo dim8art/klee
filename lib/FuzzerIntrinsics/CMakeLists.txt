@@ -8,7 +8,7 @@
 #===------------------------------------------------------------------------===#
 
 add_library(kleeFuzzerIntrinsics SHARED
-  fuzzer_intrinsics.c
+  fuzzer_intrinsics.cpp
   # Mocks:
   ${CMAKE_SOURCE_DIR}/runtime/Mocks/models.c
   # HACK:
