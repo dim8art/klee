@@ -21,8 +21,8 @@ class Fuzzer {
   llvm::Module *m;
 
 public:
-  Fuzzer(llvm::Module *m) : m(m) {}
-
+  Fuzzer(llvm::Module *m);
+  
   void initializeEngine();
 
   void fuzz();

@@ -25,3 +25,4 @@ debug = true
 [dependencies]
 libafl = { path = "/home/dim8art/klee/LibAFL/libafl/" }
 libafl_bolts = { path = "/home/dim8art/klee/LibAFL/libafl_bolts/" }
+libafl_targets = { path = "/home/dim8art/klee/LibAFL/libafl_targets/" }

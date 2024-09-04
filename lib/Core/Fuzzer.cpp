@@ -12,6 +12,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 
 #include <cstdint>
 #include <memory>
@@ -19,13 +20,15 @@
 
 using namespace klee;
 
+Fuzzer::Fuzzer(llvm::Module *m) : m(m) {}
+
 void Fuzzer::initializeEngine() {
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   llvm::InitializeNativeTargetAsmParser();
   std::string error;
-  auto mUniq = std::unique_ptr<llvm::Module>(m);
-  executionEngine = llvm::EngineBuilder(std::move(mUniq))
+  auto mClone = llvm::CloneModule(*m);
+  executionEngine = llvm::EngineBuilder(std::move(mClone))
                         .setErrorStr(&error)
                         .setEngineKind(llvm::EngineKind::JIT)
                         .create();
@@ -54,10 +57,11 @@ void Fuzzer::fuzz() {
   void *harness =
       llvm::sys::DynamicLibrary::SearchForAddressOfSymbol("klee_harness");
   uint64_t mainAddr = executionEngine->getFunctionAddress("main");
-  FuzzInfo harness_fi((void (*)(const uint8_t *, size_t, uint64_t))harness,
+  FuzzInfo harness_fi((void (*)(const uint8_t *, size_t, uint64_t, size_t))harness,
                       mainAddr);
   llvm::errs()<<(uint64_t)harness_fi.harness;
   fuzzInternal(harness_fi);
+  
 }
 
 std::vector<uint8_t> Fuzzer::bytesArrayFromKtest(KTest *kTest) {
