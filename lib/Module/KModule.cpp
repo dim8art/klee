@@ -7,6 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <klee/System/Time.h>
 #define DEBUG_TYPE "KModule"
 
 #include "Passes.h"
@@ -260,6 +261,16 @@ void KModule::optimiseAndPrepare(
     llvm::ArrayRef<const char *> preservedFunctions) {
   // Preserve all functions containing klee-related function calls from being
   // optimised around
+
+  auto start = klee::time::getWallTime();
+  /* TODO: */ {
+    legacy::PassManager pm;
+    pm.add(new DbgIntrinsicWrapperPass());
+    pm.run(*module);
+  }
+  auto end = klee::time::getWallTime();
+  klee_message("Instrumentation elapsed:  %lu", (end - start).toMicroseconds());
+
   if (!OptimiseKLEECall) {
     legacy::PassManager pm;
     pm.add(new OptNonePass());
