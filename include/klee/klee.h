@@ -51,7 +51,7 @@ int klee_range(int begin, int end, const char *name);
  */
 int klee_int(const char *name);
 
-void klee_harness(const uint8_t *_bytes, size_t _numBytes, uint64_t mainAddr, size_t id);
+void klee_harness(const uint8_t *_bytes, size_t _numBytes, uint64_t mainAddr, uint32_t id);
 
 /* klee_silent_exit - Terminate the current KLEE process without generating a
  * test file.

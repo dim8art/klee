@@ -5,9 +5,9 @@
 extern "C" {
 
 struct FuzzInfo {
-  void (*harness)(const uint8_t *, size_t, uint64_t, size_t);
+  void (*harness)(const uint8_t *, size_t, uint64_t, uint32_t);
   uint64_t mainAddr;
-  FuzzInfo(void (*harness)(const uint8_t *, size_t, uint64_t, size_t),
+  FuzzInfo(void (*harness)(const uint8_t *, size_t, uint64_t, uint32_t),
            uint64_t mainAddr)
       : harness(harness), mainAddr(mainAddr) {}
 };

@@ -134,7 +134,7 @@ void klee_assume(uintptr_t x) {
 }
 
 void klee_harness(const uint8_t *_bytes, size_t _numBytes, uint64_t mainAddr,
-                  size_t id) {
+                  uint32_t id) {
   varEntries.clear();
   printf("klee_harness began\n");
   bytes = _bytes;

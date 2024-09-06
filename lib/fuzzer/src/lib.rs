@@ -4,8 +4,8 @@ use std::io::{stdout, Write};
 #[cfg(windows)]
 use std::ptr::write_volatile;
 use std::{path::PathBuf, ptr::write};
-
 use std::time::{Duration, Instant};
+use std::mem::{transmute, size_of};
 
 extern crate libafl;
 
@@ -35,11 +35,10 @@ use libafl_bolts::{
 /// Coverage map with explicit assignments due to the lack of instrumentation
 
 static mut SOLUTIONS: Vec<FuzzSolution> = Vec::new();
-static mut MAX_EDGES_NUM: usize = 16;
 
 #[repr(C)]
 pub struct FuzzInfo {
-    pub harness: extern "C" fn(*const u8, usize, u64, usize),
+    pub harness: extern "C" fn(*const u8, usize, u64, u32),
     pub mainAddr: u64,
 }
 
@@ -63,14 +62,18 @@ pub unsafe extern "C" fn getFuzzSolution() -> FuzzSolution {
     return SOLUTIONS.pop().unwrap();
 }
 
+
+
 #[no_mangle]
 pub unsafe extern "C" fn fuzzInternal(fi: FuzzInfo) {
     let mut lock = stdout().lock();
     let mut shmem_provider   = StdShMemProvider::new().unwrap();
-    let mut SIGNALS = shmem_provider.new_shmem(16).unwrap();
+    let mut SIGNALS = shmem_provider.new_shmem(1024).unwrap();
     let SIGNALS_PTR: *mut u8 = SIGNALS.as_mut_ptr();
-    let mut CNT: usize = 0;
-
+    let mut CNT_SHMEM = shmem_provider.new_shmem(1024).unwrap();
+    let CNT_PTR = CNT_SHMEM.as_mut_ptr();
+    let CNT =  unsafe { CNT_PTR as *mut u32};
+    write!(lock, "*CNT = {}\n", *CNT).unwrap();
     let signals_set = |idx: usize| {
         unsafe { write(SIGNALS_PTR.add(idx), 1) };
     };
@@ -88,10 +91,10 @@ pub unsafe extern "C" fn fuzzInternal(fi: FuzzInfo) {
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
-        CNT = CNT + 1;
-        write!(lock, "CNT = {}\n", CNT).unwrap();
-        (fi.harness)(buf.as_ptr(), buf.len(), fi.mainAddr, CNT);
-        signals_set(CNT);
+        *CNT = *CNT + 1;
+        write!(lock, "*CNT = {}\n", *CNT).unwrap();
+        (fi.harness)(buf.as_ptr(), buf.len(), fi.mainAddr, *CNT);
+        signals_set(*CNT as usize);
         ExitKind::Ok
     };
 

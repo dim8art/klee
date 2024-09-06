@@ -57,7 +57,7 @@ void Fuzzer::fuzz() {
   void *harness =
       llvm::sys::DynamicLibrary::SearchForAddressOfSymbol("klee_harness");
   uint64_t mainAddr = executionEngine->getFunctionAddress("main");
-  FuzzInfo harness_fi((void (*)(const uint8_t *, size_t, uint64_t, size_t))harness,
+  FuzzInfo harness_fi((void (*)(const uint8_t *, size_t, uint64_t, uint32_t))harness,
                       mainAddr);
   llvm::errs()<<(uint64_t)harness_fi.harness;
   fuzzInternal(harness_fi);
