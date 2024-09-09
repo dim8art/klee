@@ -12,7 +12,6 @@ set(KLEE_MODULE_COMPONENT_SRCS
   CallRemover.cpp
   Checks.cpp
   CodeGraphInfo.cpp
-  DbgIntrinsicWrapper.cpp
   FunctionAlias.cpp
   LocationInfo.cpp
   InstructionOperandTypeCheckPass.cpp

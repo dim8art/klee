@@ -262,15 +262,6 @@ void KModule::optimiseAndPrepare(
   // Preserve all functions containing klee-related function calls from being
   // optimised around
 
-  auto start = klee::time::getWallTime();
-  /* TODO: */ {
-    legacy::PassManager pm;
-    pm.add(new DbgIntrinsicWrapperPass());
-    pm.run(*module);
-  }
-  auto end = klee::time::getWallTime();
-  klee_message("Instrumentation elapsed:  %lu", (end - start).toMicroseconds());
-
   if (!OptimiseKLEECall) {
     legacy::PassManager pm;
     pm.add(new OptNonePass());

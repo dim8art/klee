@@ -5,8 +5,11 @@ import subprocess
 import shutil
 import tempfile
 import hashlib
+import json
+
 from functools import partial
 from pathlib import Path
+import src_tooling_runner
 
 
 def klee_options(
@@ -199,7 +202,8 @@ class KLEEF(object):
         use_perf=False,
         use_valgrind=False,
         write_ktests=False,
-        run_forever=False
+        run_forever=False,
+        property_file=None,
     ):
         self.source = Path(source) if source else None
         self.is32 = is32
@@ -211,6 +215,7 @@ class KLEEF(object):
         self.max_time = max_time
         self.use_perf = use_perf
         self.use_valgrind = use_valgrind
+        self.property_file = property_file
         if write_ktests:
             self.write_ktests = "true"
         else:
@@ -259,6 +264,11 @@ class KLEEF(object):
             self.compiled_file,
             self.source,
         ]
+        
+        if self.property_file is not None:
+            self.source = self.instrument(cmd)
+            cmd[len(cmd) - 1] = self.source
+
         check_call(cmd)
 
         # Compile library
@@ -280,6 +290,13 @@ class KLEEF(object):
             self.compiled_file,
         ]
         check_call(cmd)
+
+    def instrument(self, cmd: list) -> Path:
+        assert(self.property_file is not None)
+        
+        return_value = src_tooling_runner.run(cmd, ["-32" if self.is32 else "-64", f"--goal={self.property_file}", str(self.source)])
+        assert(return_value is not None)
+        return return_value
 
     def isModifyingUlimitPermitted(self):
         out = subprocess.run(
@@ -420,7 +437,8 @@ def run(args):
         use_perf=args.perf,
         use_valgrind=args.valgrind,
         write_ktests=args.write_ktests,
-        run_forever=args.run_forever
+        run_forever=args.run_forever,
+        property_file=args.property_file,
     )
     wrapper.compile()
     return wrapper.run()

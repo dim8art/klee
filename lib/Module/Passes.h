@@ -15,9 +15,6 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
-#include <llvm-14/llvm/IR/IRBuilder.h>
-#include <llvm-14/llvm/IR/IntrinsicInst.h>
-#include <unordered_set>
 
 namespace llvm {
 class Function;
@@ -254,22 +251,6 @@ public:
   static char ID;
   LocalVarDeclarationFinderPass() : llvm::FunctionPass(ID) {}
   bool runOnFunction(llvm::Function &) override;
-};
-
-class DbgIntrinsicWrapperPass : public llvm::ModulePass {
-private:
-  std::string generateNewWrapperName();
-  llvm::Function &wrapInFunction(llvm::DbgInfoIntrinsic &);
-  bool runOnBasicBlock(llvm::BasicBlock &);
-
-public:
-  static char ID;
-  DbgIntrinsicWrapperPass() : llvm::ModulePass(ID) {}
-  bool runOnModule(llvm::Module &) override;
-
-private:
-  std::unordered_set<llvm::Function *> addedWrappers;
-  std::size_t wrappedCounter = 0;
 };
 
 } // namespace klee

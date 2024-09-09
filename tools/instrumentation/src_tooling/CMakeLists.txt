@@ -28,11 +28,6 @@ add_clang_executable(label-adder
     LabelerFrontendActionFactory.hpp
   )
 
-message(LLVM_INCLUDE_DIRS: ${LLVM_INCLUDE_DIRS})
-message(LLVM_LIBRARY_DIRS: ${LLVM_LIBRARY_DIRS})
-message(LLVM_DEFINITIONS: ${LLVM_DEFINITIONS})
-message(LLVM_LIBRARIES: ${LLVM_LIBRARIES})
-
 target_include_directories(label-adder SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
 target_link_directories(label-adder PRIVATE ${LLVM_LIBRARY_DIRS})
 
@@ -40,9 +35,5 @@ target_link_libraries(label-adder
   PRIVATE
   clang-cpp
   )
-
-# target_link_libraries(label-adder PRIVATE clang-cpp)
-
-# llvm_config(label-adder "${USE_LLVM_SHARED}" support all)
 
 install(TARGETS label-adder RUNTIME DESTINATION bin)

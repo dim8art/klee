@@ -711,6 +711,7 @@ llvm::Module *Executor::setModule(
 
   // except the entry point
   preservedFunctions.push_back(opts.EntryPoint.c_str());
+  preservedFunctions.push_back("llvm.dbg.label");
 
   kmodule->optimiseAndPrepare(opts, preservedFunctions);
   kmodule->checkModule();
