@@ -69,6 +69,7 @@ def klee_options(
         "--memory-backend=mixed",
         "--max-fixed-size-structures-size=64",
         "--use-batching-search",
+        "--optimize=true",
     ]
     if True:
         cmd += [
@@ -89,7 +90,6 @@ def klee_options(
 
     if f_err:
         cmd += [
-            "--optimize=true",
             "--use-alpha-equivalence=true",
             "--function-call-reproduce=reach_error",
             # "--max-cycles=0",
@@ -115,7 +115,6 @@ def klee_options(
 
     if f_cov:
         cmd += [
-            "--optimize=false",
             "--mem-trigger-cof=false", # Start on the fly tests generation after approaching memory cup
             "--use-alpha-equivalence=true",
             "--optimize-aggressive=false",

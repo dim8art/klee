@@ -695,6 +695,7 @@ llvm::Module *Executor::setModule(
   preservedFunctions.push_back("memcpy");
   preservedFunctions.push_back("memcmp");
   preservedFunctions.push_back("memmove");
+  preservedFunctions.push_back("llvm.dbg.label");
 
   if (FunctionCallReproduce != "") {
     preservedFunctions.push_back(FunctionCallReproduce.c_str());
@@ -711,7 +712,6 @@ llvm::Module *Executor::setModule(
 
   // except the entry point
   preservedFunctions.push_back(opts.EntryPoint.c_str());
-  preservedFunctions.push_back("llvm.dbg.label");
 
   kmodule->optimiseAndPrepare(opts, preservedFunctions);
   kmodule->checkModule();

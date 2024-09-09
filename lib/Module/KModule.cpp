@@ -8,6 +8,8 @@
 //===----------------------------------------------------------------------===//
 
 #include <klee/System/Time.h>
+#include <llvm-14/llvm/IR/Attributes.h>
+#include <llvm-14/llvm/Transforms/IPO.h>
 #define DEBUG_TYPE "KModule"
 
 #include "Passes.h"
@@ -262,6 +264,19 @@ void KModule::optimiseAndPrepare(
   // Preserve all functions containing klee-related function calls from being
   // optimised around
 
+  auto start = klee::time::getWallTime();
+  std::unordered_set<llvm::Function *> addedWrappers;
+  /* TODO: */ {
+    legacy::PassManager pm;
+    auto dbgIntrinsincWrapperPass = new DbgIntrinsicWrapperPass();
+    pm.add(dbgIntrinsincWrapperPass);
+    pm.run(*module);
+    addedWrappers = std::move(dbgIntrinsincWrapperPass->addedWrappers);
+  }
+
+  auto end = klee::time::getWallTime();
+  klee_message("Instrumentation elapsed:  %lu", (end - start).toMicroseconds());
+
   if (!OptimiseKLEECall) {
     legacy::PassManager pm;
     pm.add(new OptNonePass());
@@ -329,6 +344,12 @@ void KModule::optimiseAndPrepare(
     pm3.add(new ReturnSplitter());
   }
   pm3.run(*module);
+
+  {
+    llvm::legacy::PassManager pm;
+    pm.add(new DbgIntrinsicUnwrapperPass(std::move(addedWrappers)));
+    pm.run(*module);
+  }
 }
 
 class InstructionToLineAnnotator : public llvm::AssemblyAnnotationWriter {
