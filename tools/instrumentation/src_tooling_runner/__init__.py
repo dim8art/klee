@@ -123,8 +123,6 @@ def parse_coverage_goal_file(goal_file: str) -> str:
 
 
 def run(cmd: list, argv=None) -> Path:
-    logging.basicConfig(level=logging.DEBUG)
-
     args = parse(argv)
 
     try:

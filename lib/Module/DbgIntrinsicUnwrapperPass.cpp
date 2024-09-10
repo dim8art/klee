@@ -15,6 +15,7 @@
 #include "llvm/IR/Value.h"
 #include "llvm/Support/Casting.h"
 #include <llvm-14/llvm/ADT/SmallVector.h>
+#include <llvm-14/llvm/Analysis/CallGraph.h>
 #include <llvm-14/llvm/IR/Attributes.h>
 #include <llvm-14/llvm/IR/Constants.h>
 #include <llvm-14/llvm/IR/DerivedTypes.h>
@@ -50,9 +51,6 @@ DbgIntrinsicUnwrapperPass::unwrapCall(llvm::CallInst &callInst) {
   llvm::IRBuilder<> builder(ctx);
   auto callToDbgInst = builder.CreateCall(functionCallee, operands->get());
   callToDbgInst->setDebugLoc(intrinsic.getDebugLoc());
-
-  callInst.dump();
-  callToDbgInst->dump();
 
   return {{&callInst, callToDbgInst}};
 }
@@ -101,11 +99,14 @@ bool DbgIntrinsicUnwrapperPass::runOnModule(llvm::Module &module) {
     }
   }
 
-  for (auto wrapper : wrappers) {
-    wrapper->deleteBody();
-    wrapper->replaceAllUsesWith(llvm::UndefValue::get(wrapper->getType()));
-    wrapper->removeFromParent();
-  }
+  // llvm::CallGraph callGraph(module);
+  // for (auto wrapper : wrappers) {
+  //   // wrapper->deleteBody();
+  //   callGraph.removeFunctionFromModule(callGraph.getOrInsertFunction(wrapper));
+  //   //
+  //   wrapper->replaceAllUsesWith(llvm::UndefValue::get(wrapper->getType()));
+  //   wrapper->removeFromParent();
+  // }
 
   return true;
 }
