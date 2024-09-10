@@ -13,28 +13,67 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include <cstdint>
 #include <memory>
 #include <vector>
 
 using namespace klee;
+using namespace llvm;
 
-Fuzzer::Fuzzer(llvm::Module *m) : m(m) {}
+Fuzzer::Fuzzer(Module *originalModule) : originalModule(originalModule) {}
+
+llvm::Function *
+Fuzzer::addInstrumentationDeclaration(LLVMContext &context,
+                                      std::unique_ptr<llvm::Module> &module) {
+  return Function::Create(FunctionType::get(Type::getVoidTy(context), false),
+                          Function::ExternalLinkage, "__record_coverage",
+                          module.get());
+}
+
+void Fuzzer::createInstumentation(LLVMContext &context,
+                                  std::unique_ptr<llvm::Module> &module) {
+  llvm::Function * instrument =  addInstrumentationDeclaration(context, module);                              
+  for (auto &function : *module) {
+    for (auto &bb : function) {
+      if (instrument) {
+        builder->SetInsertPoint(&bb, bb.begin());
+        builder->CreateCall(instrument);
+      }
+    }
+  }
+  std::error_code EC;
+  llvm::raw_fd_ostream File(
+      "/home/dim8art/klee_build/klee_build140bitwuzla_stp_z3Debug/instrumentedoutput.ll", EC,
+      llvm::sys::fs::OF_None);
+  if (EC) {
+    llvm::errs() << "Error opening file: " << EC.message() << "\n";
+  }
+  else {
+     llvm::errs() << "File opened yay ^): " << "\n";
+    module->print(File, nullptr);
+  }
+}
 
 void Fuzzer::initializeEngine() {
-  llvm::InitializeNativeTarget();
-  llvm::InitializeNativeTargetAsmPrinter();
-  llvm::InitializeNativeTargetAsmParser();
+  InitializeNativeTarget();
+  InitializeNativeTargetAsmPrinter();
+  InitializeNativeTargetAsmParser();
   std::string error;
-  auto mClone = llvm::CloneModule(*m);
-  executionEngine = llvm::EngineBuilder(std::move(mClone))
+  auto clonedModule = CloneModule(*originalModule);
+  LLVMContext &context = clonedModule->getContext();
+  builder = std::unique_ptr<IRBuilder<>>(new IRBuilder<>(context));
+  createInstumentation(context, clonedModule);
+  
+  executionEngine = EngineBuilder(std::move(clonedModule))
                         .setErrorStr(&error)
-                        .setEngineKind(llvm::EngineKind::JIT)
+                        .setEngineKind(EngineKind::JIT)
                         .create();
 
   if (!executionEngine) {
-    llvm::errs() << "unable to make jit: " << error << "\n";
+    errs() << "unable to make jit: " << error << "\n";
     abort();
   }
 
@@ -43,9 +82,11 @@ void Fuzzer::initializeEngine() {
     // Make sure we can resolve symbols in the program as well. The zero arg
     // to the function tells DynamicLibrary to load the program, not a
     // library.
-    llvm::sys::DynamicLibrary::LoadLibraryPermanently(
+    sys::DynamicLibrary::LoadLibraryPermanently(
         "/home/dim8art/klee_build/klee_build140bitwuzla_stp_z3Debug/lib/"
         "libkleeFuzzerIntrinsics.so"); // fix address
+    sys::DynamicLibrary::LoadLibraryPermanently(
+        0);
     // InitializeNativeTarget();
     // InitializeNativeTargetAsmPrinter();
     // InitializeNativeTargetAsmParser();
@@ -54,14 +95,18 @@ void Fuzzer::initializeEngine() {
 
 void Fuzzer::fuzz() {
   initializeEngine();
-  void *harness =
-      llvm::sys::DynamicLibrary::SearchForAddressOfSymbol("klee_harness");
+  void *harness = sys::DynamicLibrary::SearchForAddressOfSymbol("klee_harness");
   uint64_t mainAddr = executionEngine->getFunctionAddress("main");
-  FuzzInfo harness_fi((void (*)(const uint8_t *, size_t, uint64_t, uint32_t))harness,
-                      mainAddr);
-  llvm::errs()<<(uint64_t)harness_fi.harness;
+  FuzzInfo harness_fi(
+      (void (*)(const uint8_t *, size_t, uint64_t, uint32_t))harness, mainAddr);
+  void (*mainfn)()  = (void(*)())(mainAddr);
+  llvm::errs()<<"maindone\n";
+  uint8_t * bytes = (unsigned char *)calloc(5, sizeof(bytes));
+  bytes[0] = 0; bytes[1] =1; bytes[2] = 2; bytes[3] = 3; bytes[4]  = 4;
+  (*harness_fi.harness)(bytes, 5 , mainAddr, 666);
+  errs() << (uint64_t)harness_fi.harness << " ";
+  errs() << mainAddr << "\n";
   fuzzInternal(harness_fi);
-  
 }
 
 std::vector<uint8_t> Fuzzer::bytesArrayFromKtest(KTest *kTest) {

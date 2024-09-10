@@ -62,7 +62,10 @@ pub unsafe extern "C" fn getFuzzSolution() -> FuzzSolution {
     return SOLUTIONS.pop().unwrap();
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn __record_coverage() {
 
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn fuzzInternal(fi: FuzzInfo) {
