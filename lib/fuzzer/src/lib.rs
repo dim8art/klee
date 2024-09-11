@@ -64,19 +64,18 @@ pub unsafe extern "C" fn getFuzzSolution() -> FuzzSolution {
 
 #[no_mangle]
 pub unsafe extern "C" fn __record_coverage() {
-
+    write!(stdout().lock(), "record coverage works yay \n").unwrap();
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn fuzzInternal(fi: FuzzInfo) {
-    let mut lock = stdout().lock();
     let mut shmem_provider   = StdShMemProvider::new().unwrap();
     let mut SIGNALS = shmem_provider.new_shmem(1024).unwrap();
     let SIGNALS_PTR: *mut u8 = SIGNALS.as_mut_ptr();
     let mut CNT_SHMEM = shmem_provider.new_shmem(1024).unwrap();
     let CNT_PTR = CNT_SHMEM.as_mut_ptr();
     let CNT =  unsafe { CNT_PTR as *mut u32};
-    write!(lock, "*CNT = {}\n", *CNT).unwrap();
+    write!(stdout().lock(), "*CNT = {}\n", *CNT).unwrap();
     let signals_set = |idx: usize| {
         unsafe { write(SIGNALS_PTR.add(idx), 1) };
     };
@@ -95,7 +94,7 @@ pub unsafe extern "C" fn fuzzInternal(fi: FuzzInfo) {
         let target = input.target_bytes();
         let buf = target.as_slice();
         *CNT = *CNT + 1;
-        write!(lock, "*CNT = {}\n", *CNT).unwrap();
+        write!(stdout().lock(), "*CNT = {}\n", *CNT).unwrap();
         (fi.harness)(buf.as_ptr(), buf.len(), fi.mainAddr, *CNT);
         signals_set(*CNT as usize);
         ExitKind::Ok
@@ -170,7 +169,7 @@ pub unsafe extern "C" fn fuzzInternal(fi: FuzzInfo) {
     
 
     for _x in 1..10 {
-        //write!(lock, "fuzzer is fuzzing").unwrap();
+        //write!(stdout().lock(), "fuzzer is fuzzing").unwrap();
 
         fuzzer
             .fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)
@@ -194,6 +193,6 @@ pub unsafe extern "C" fn fuzzInternal(fi: FuzzInfo) {
             }
         }
     }
-    write!(lock, "solutionlen = {}\n", &SOLUTIONS.len()).unwrap();
-    write!(lock, "fuzzer is done fuzzing\n").unwrap();
+    write!(stdout().lock(), "solutionlen = {}\n", &SOLUTIONS.len()).unwrap();
+    write!(stdout().lock(), "fuzzer is done fuzzing\n").unwrap();
 }

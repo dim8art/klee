@@ -26,7 +26,7 @@ using namespace llvm;
 Fuzzer::Fuzzer(Module *originalModule) : originalModule(originalModule) {}
 
 llvm::Function *
-Fuzzer::addInstrumentationDeclaration(LLVMContext &context,
+Fuzzer::getRecordCoverage(LLVMContext &context,
                                       std::unique_ptr<llvm::Module> &module) {
   return Function::Create(FunctionType::get(Type::getVoidTy(context), false),
                           Function::ExternalLinkage, "__record_coverage",
@@ -34,14 +34,12 @@ Fuzzer::addInstrumentationDeclaration(LLVMContext &context,
 }
 
 void Fuzzer::createInstumentation(LLVMContext &context,
-                                  std::unique_ptr<llvm::Module> &module) {
-  llvm::Function * instrument =  addInstrumentationDeclaration(context, module);                              
+                                  std::unique_ptr<llvm::Module> &module, 
+                                  llvm::Function * recordCoverageFunc) {                    
   for (auto &function : *module) {
     for (auto &bb : function) {
-      if (instrument) {
-        builder->SetInsertPoint(&bb, bb.begin());
-        builder->CreateCall(instrument);
-      }
+      builder->SetInsertPoint(&bb, bb.begin());
+      builder->CreateCall(recordCoverageFunc);
     }
   }
   std::error_code EC;
@@ -65,7 +63,9 @@ void Fuzzer::initializeEngine() {
   auto clonedModule = CloneModule(*originalModule);
   LLVMContext &context = clonedModule->getContext();
   builder = std::unique_ptr<IRBuilder<>>(new IRBuilder<>(context));
-  createInstumentation(context, clonedModule);
+
+  llvm::Function * recordCoverageFunc = getRecordCoverage(context, clonedModule);       
+  createInstumentation(context, clonedModule, recordCoverageFunc);
   
   executionEngine = EngineBuilder(std::move(clonedModule))
                         .setErrorStr(&error)
@@ -77,20 +77,13 @@ void Fuzzer::initializeEngine() {
     abort();
   }
 
-  // from ExecutionEngine::create
   if (executionEngine) {
-    // Make sure we can resolve symbols in the program as well. The zero arg
-    // to the function tells DynamicLibrary to load the program, not a
-    // library.
+    executionEngine->addGlobalMapping(recordCoverageFunc,
+                                      (void *)(&__record_coverage));
     sys::DynamicLibrary::LoadLibraryPermanently(
         "/home/dim8art/klee_build/klee_build140bitwuzla_stp_z3Debug/lib/"
-        "libkleeFuzzerIntrinsics.so"); // fix address
-    sys::DynamicLibrary::LoadLibraryPermanently(
-        0);
-    // InitializeNativeTarget();
-    // InitializeNativeTargetAsmPrinter();
-    // InitializeNativeTargetAsmParser();
-  }
+        "libkleeFuzzerIntrinsics.so");
+    }
 }
 
 void Fuzzer::fuzz() {
@@ -99,8 +92,7 @@ void Fuzzer::fuzz() {
   uint64_t mainAddr = executionEngine->getFunctionAddress("main");
   FuzzInfo harness_fi(
       (void (*)(const uint8_t *, size_t, uint64_t, uint32_t))harness, mainAddr);
-  void (*mainfn)()  = (void(*)())(mainAddr);
-  llvm::errs()<<"maindone\n";
+
   uint8_t * bytes = (unsigned char *)calloc(5, sizeof(bytes));
   bytes[0] = 0; bytes[1] =1; bytes[2] = 2; bytes[3] = 3; bytes[4]  = 4;
   (*harness_fi.harness)(bytes, 5 , mainAddr, 666);

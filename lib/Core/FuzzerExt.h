@@ -18,7 +18,7 @@ struct FuzzSolution {
 };
 
 FuzzSolution getFuzzSolution();
-void __record_coversge();
+void __record_coverage();
 void fuzzInternal(FuzzInfo fi);
 
 }

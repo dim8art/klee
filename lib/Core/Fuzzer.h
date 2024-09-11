@@ -32,10 +32,10 @@ private:
   void initializeEngine();
 
   llvm::Function *
-  addInstrumentationDeclaration(llvm::LLVMContext &context,
+  getRecordCoverage(llvm::LLVMContext &context,
                                 std::unique_ptr<llvm::Module> &module);
   void createInstumentation(llvm::LLVMContext &context,
-                            std::unique_ptr<llvm::Module> &module);
+                            std::unique_ptr<llvm::Module> &module, llvm::Function * recordCoverageFunc);
   llvm::BasicBlock *cloneBasicBlock(llvm::BasicBlock *BB);
 
   std::vector<uint8_t> bytesArrayFromKtest(KTest *kTest);
