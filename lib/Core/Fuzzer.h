@@ -39,7 +39,7 @@ private:
   llvm::BasicBlock *cloneBasicBlock(llvm::BasicBlock *BB);
 
   std::vector<uint8_t> bytesArrayFromKtest(KTest *kTest);
-
+  KTest* kTestFromBytesArray(std::vector<uint8_t> bytes);
 public:
   Fuzzer(llvm::Module *m);
   void fuzz();

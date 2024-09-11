@@ -144,7 +144,7 @@ void klee_harness(const uint8_t *_bytes, size_t _numBytes, uint64_t mainAddr,
   printf("%u, %u , %u, %u\n", *_bytes, _numBytes, mainAddr, id);
   (*f)();
   KTest *ktest = (KTest *)calloc(1, sizeof(*ktest));
-
+  //debuginfo delete later
   generateKTest(ktest);
   kTest_toFile(
       ktest,

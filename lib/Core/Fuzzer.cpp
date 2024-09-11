@@ -9,12 +9,11 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/DynamicLibrary.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/raw_ostream.h"
 
 #include <cstdint>
 #include <memory>
@@ -27,15 +26,15 @@ Fuzzer::Fuzzer(Module *originalModule) : originalModule(originalModule) {}
 
 llvm::Function *
 Fuzzer::getRecordCoverage(LLVMContext &context,
-                                      std::unique_ptr<llvm::Module> &module) {
+                          std::unique_ptr<llvm::Module> &module) {
   return Function::Create(FunctionType::get(Type::getVoidTy(context), false),
                           Function::ExternalLinkage, "__record_coverage",
                           module.get());
 }
 
 void Fuzzer::createInstumentation(LLVMContext &context,
-                                  std::unique_ptr<llvm::Module> &module, 
-                                  llvm::Function * recordCoverageFunc) {                    
+                                  std::unique_ptr<llvm::Module> &module,
+                                  llvm::Function *recordCoverageFunc) {
   for (auto &function : *module) {
     for (auto &bb : function) {
       builder->SetInsertPoint(&bb, bb.begin());
@@ -44,13 +43,13 @@ void Fuzzer::createInstumentation(LLVMContext &context,
   }
   std::error_code EC;
   llvm::raw_fd_ostream File(
-      "/home/dim8art/klee_build/klee_build140bitwuzla_stp_z3Debug/instrumentedoutput.ll", EC,
-      llvm::sys::fs::OF_None);
+      "/home/dim8art/klee_build/klee_build140bitwuzla_stp_z3Debug/"
+      "instrumentedoutput.ll",
+      EC, llvm::sys::fs::OF_None);
   if (EC) {
     llvm::errs() << "Error opening file: " << EC.message() << "\n";
-  }
-  else {
-     llvm::errs() << "File opened yay ^): " << "\n";
+  } else {
+    llvm::errs() << "File opened yay ^): " << "\n";
     module->print(File, nullptr);
   }
 }
@@ -64,9 +63,9 @@ void Fuzzer::initializeEngine() {
   LLVMContext &context = clonedModule->getContext();
   builder = std::unique_ptr<IRBuilder<>>(new IRBuilder<>(context));
 
-  llvm::Function * recordCoverageFunc = getRecordCoverage(context, clonedModule);       
+  llvm::Function *recordCoverageFunc = getRecordCoverage(context, clonedModule);
   createInstumentation(context, clonedModule, recordCoverageFunc);
-  
+
   executionEngine = EngineBuilder(std::move(clonedModule))
                         .setErrorStr(&error)
                         .setEngineKind(EngineKind::JIT)
@@ -83,7 +82,7 @@ void Fuzzer::initializeEngine() {
     sys::DynamicLibrary::LoadLibraryPermanently(
         "/home/dim8art/klee_build/klee_build140bitwuzla_stp_z3Debug/lib/"
         "libkleeFuzzerIntrinsics.so");
-    }
+  }
 }
 
 void Fuzzer::fuzz() {
@@ -93,11 +92,6 @@ void Fuzzer::fuzz() {
   FuzzInfo harness_fi(
       (void (*)(const uint8_t *, size_t, uint64_t, uint32_t))harness, mainAddr);
 
-  uint8_t * bytes = (unsigned char *)calloc(5, sizeof(bytes));
-  bytes[0] = 0; bytes[1] =1; bytes[2] = 2; bytes[3] = 3; bytes[4]  = 4;
-  (*harness_fi.harness)(bytes, 5 , mainAddr, 666);
-  errs() << (uint64_t)harness_fi.harness << " ";
-  errs() << mainAddr << "\n";
   fuzzInternal(harness_fi);
 }
 
@@ -112,4 +106,21 @@ std::vector<uint8_t> Fuzzer::bytesArrayFromKtest(KTest *kTest) {
     }
   }
   return res;
+}
+
+KTest *Fuzzer::kTestFromBytesArray(std::vector<uint8_t> bytes) {
+  uint8_t *bytesPtr = bytes.data();
+  size_t bytesSize = bytes.size();
+  auto harness = (void (*)(const uint8_t *, size_t, uint64_t, uint32_t))
+      sys::DynamicLibrary::SearchForAddressOfSymbol("klee_harness");
+  uint64_t mainAddr = executionEngine->getFunctionAddress("main");
+  (harness)(bytesPtr, bytesSize, mainAddr, 0);
+  auto generator = (bool (*)(
+      KTest *))sys::DynamicLibrary::SearchForAddressOfSymbol("generateKTest");
+  KTest *ktest = (KTest *)calloc(1, sizeof(*ktest));
+  bool success = (*generator)(ktest);
+  if (!success) {
+    return 0;
+  }
+  return ktest;
 }
