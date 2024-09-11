@@ -10,6 +10,7 @@
 """Module for creation and execution of test harnesses from test-format XML files."""
 
 import os
+import tempfile
 
 from src_tooling_runner import execution_utils as eu
 from src_tooling_runner import transformer as tr

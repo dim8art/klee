@@ -268,6 +268,7 @@ def form_compiliation_commands(cmd: list, file: Path) -> Path:
         ]
     )
     
-    with open(path_to_file.parent / "compile_commands.json", "w+") as file_compilation_commands:
+    path_compilation_commands: str = tempfile.mktemp()
+    with open(path_compilation_commands, "w+") as file_compilation_commands:
         file_compilation_commands.write(compilation_commands_content)
-    return path_to_file.parent / "compile_commands.json"
+    return path_compilation_commands

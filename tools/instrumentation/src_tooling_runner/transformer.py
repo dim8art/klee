@@ -36,7 +36,8 @@ def _preprocess(input_program: str, machine_model: str) -> str:
     :param machine_model: machine-model to use for pre-processing
     :return: name of new, pre-processed program file
     """
-    preprocessed_file = input_program + ".i"
+    preprocessed_file: str = tempfile.mktemp()
+    # preprocessed_file = input_program + ".i"
     cmd = [eu.COMPILER, machine_model, "-E", input_program, "-o", preprocessed_file]
     eu.execute(cmd, quiet=True)
 
@@ -106,10 +107,19 @@ def instrument_program(
 
 def _call_label_adder(cmd, parameters: Sequence[str], input_content: str):
     with tempfile.NamedTemporaryFile(mode="w", encoding="UTF-8", suffix=".c") as tmp:
-        compiliation_commands_path: Path = eu.form_compiliation_commands(cmd, Path(tmp.name))
+        print(tmp.name)
+
+        compiliation_commands_path: Path | None = None
+        if cmd is not None:
+            compiliation_commands_path: Path = eu.form_compiliation_commands(cmd, Path(tmp.name))
+            print(f"Compile_commands lie in: {compiliation_commands_path}")
+    
         tmp.write(input_content)
         tmp.flush()
-        cmd = [_get_label_adder_bin(), *parameters, "-p", str(compiliation_commands_path), tmp.name]
+        cmd = [_get_label_adder_bin(), *parameters, tmp.name]
+        if compiliation_commands_path is not None:
+            cmd += ["-p", str(compiliation_commands_path)]
+
         exec_result = eu.execute(cmd, quiet=True)
         return exec_result.stdout
 

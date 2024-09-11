@@ -11,7 +11,7 @@
 import argparse
 import os
 import re
-import zipfile
+import sys
 from src_tooling_runner import execution
 from src_tooling_runner import execution_utils as eu
 from src_tooling_runner import _tool_info
@@ -138,3 +138,6 @@ def run(cmd: list, argv=None) -> Path:
             logging.info("Execution interrupted by user")
     except KeyboardInterrupt:
         logging.info("Execution interrupted by user")    
+
+def main():
+    run(None, sys.argv[1:])

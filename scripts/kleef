@@ -31,7 +31,7 @@ def klee_options(
         MAX_SOLVER_TIME = 10
     cmd = [
         "--strip-unwanted-calls",  # removes llvm.dbg.* instructions, exponentially reduces time on some benchmarks
-        "--delete-dead-loops=false",  # without this optimizer removes some code, which decreases coverage
+        # "--delete-dead-loops=false",  # without this optimizer removes some code, which decreases coverage
         "--emit-all-errors",  # without this we generate only one test for assertion failures, which decreases coverage
         "--mock-policy=all",  # this helps for some linux benchmarks, which have unused extern globals. without this flag we will not even start on them.
         "--external-calls=all",
@@ -117,7 +117,7 @@ def klee_options(
         cmd += [
             "--mem-trigger-cof=false", # Start on the fly tests generation after approaching memory cup
             "--use-alpha-equivalence=true",
-            "--optimize-aggressive=false",
+            # "--optimize-aggressive=false",
             "--track-coverage=all", # Only branches and only instructions are wrong in real life. E.g., ternary operators are sometimes counted as different branches, while we stick to look at them as a single instruction from a single branch
             "--use-iterative-deepening-search=max-cycles",
             f"--max-solver-time={MAX_SOLVER_TIME}s",
