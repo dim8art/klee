@@ -4464,37 +4464,37 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
   if (!MaxMemory)
     return None;
 
-  // We need to avoid calling GetTotalMallocUsage() often because it
-  // is O(elts on freelist). This is really bad since we start
-  // to pummel the freelist once we hit the memory cap.
-  // every 65536 instructions
-  if ((stats::instructions & 0xFFFFU) != 0 &&
-      maxNewWriteableOSSize < OSCopySizeMemoryCheckThreshold &&
+  // // We need to avoid calling GetTotalMallocUsage() often because it
+  // // is O(elts on freelist). This is really bad since we start
+  // // to pummel the freelist once we hit the memory cap.
+  // // every 65536 instructions
+  // if ((stats::instructions & 0xFFFFU) != 0 &&
+  //     maxNewWriteableOSSize < OSCopySizeMemoryCheckThreshold &&
 
-      maxNewStateStackSize < StackCopySizeMemoryCheckThreshold)
-    return None;
+  //     maxNewStateStackSize < StackCopySizeMemoryCheckThreshold)
+  //   return None;
 
-  // check memory limit
+  // // check memory limit
 
-  const auto totalUsage = getMemoryUsage() >> 20U;
+  // const auto totalUsage = getMemoryUsage() >> 20U;
 
-  if (MemoryTriggerCoverOnTheFly && totalUsage > MaxMemory * 0.75) {
-    klee_warning_once(0,
-                      "enabling cover-on-the-fly (close to memory cap: %luMB)",
-                      totalUsage);
-    coverOnTheFly = CoverOnTheFly;
-  }
-
-  // only terminate states when threshold (+1%) exceeded
-  if (totalUsage < MaxMemory * 0.6) {
-    return Executor::Low;
-  } else if (totalUsage <= MaxMemory * 1.01) {
-    return Executor::High;
-  }
+  // if (MemoryTriggerCoverOnTheFly && totalUsage > MaxMemory * 0.75) {
+  //   klee_warning_once(0,
+  //                     "enabling cover-on-the-fly (close to memory cap: %luMB)",
+  //                     totalUsage);
+  //   coverOnTheFly = CoverOnTheFly;
+  // }
 
   // just guess at how many to kill
   auto states = objectManager->getStates();
   const auto numStates = states.size();
+
+  // only terminate states when threshold (+1%) exceeded
+  if (numStates < 500) {
+    return Executor::Low;
+  } else if (numStates <= 1000) {
+    return Executor::High;
+  }
 
   // randomly select states for early termination
   std::vector<ExecutionState *> arr; // FIXME: expensive
@@ -4503,11 +4503,13 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
       arr.push_back(state);
     }
   }
-  auto toKill = arr.size() / 2;
+  int arrToKill = arr.size() - 750;
+  arrToKill = std::abs(arrToKill);
+  auto toKill = std::min(arrToKill, 0);
 
   if (toKill != 0) {
     klee_warning("killing %lu states (over memory cap: %luMB)", toKill,
-                 totalUsage);
+                 0);
   }
 
   for (unsigned i = 0, N = arr.size(); N > 0 && i < toKill; ++i, --N) {
@@ -4599,13 +4601,21 @@ void Executor::getKTestFilesInDir(std::string directoryPath,
 }
 
 std::vector<ExecutingSeed> Executor::uploadNewSeeds() {
+  // just guess at how many to kill
+  auto states = objectManager->getStates();
+  const auto numStates = states.size();
   std::vector<ExecutingSeed> seeds;
+  long diff = 750 - numStates;
+  diff = std::abs(diff);
+  long numStoredSeeds = storedSeeds->size();
+  unsigned toUpload = std::min(numStoredSeeds, diff);
+
   //FIX: experimental option + storedseedslocally behaviour (yes, no, mixed)
-  unsigned toUpload = UploadAmount;
-  if(UploadPercentage){
-    toUpload = (storedSeeds->size() * UploadPercentage) / 100;
-    if(toUpload == 0) toUpload = 1;
-  }
+  // unsigned toUpload = UploadAmount;
+  // if(UploadPercentage){
+  //   toUpload = (storedSeeds->size() * UploadPercentage) / 100;
+  //   if(toUpload == 0) toUpload = 1;
+  // }
   if (StoreSeedsLocally) {
     while ((!toUpload || seeds.size() <= toUpload) &&
            !storedSeeds->empty()) {
