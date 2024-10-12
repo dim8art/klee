@@ -166,17 +166,6 @@ cl::opt<bool>
                                       "and return null (default=false)"),
                              cl::cat(ExecCat));
 
-cl::opt<size_t> OSCopySizeMemoryCheckThreshold(
-    "os-copy-size-mem-check-threshold", cl::init(30000),
-    cl::desc("Check memory usage when this amount of bytes dense OS is copied"),
-    cl::cat(ExecCat));
-
-cl::opt<size_t> StackCopySizeMemoryCheckThreshold(
-    "stack-copy-size-mem-check-threshold", cl::init(30000),
-    cl::desc("Check memory usage when state with stack this big (in bytes) is "
-             "copied"),
-    cl::cat(ExecCat));
-
 namespace {
 
 /*** Lazy initialization options ***/
@@ -4463,35 +4452,32 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
   if (!MaxMemory)
     return None;
 
-  // // We need to avoid calling GetTotalMallocUsage() often because it
-  // // is O(elts on freelist). This is really bad since we start
-  // // to pummel the freelist once we hit the memory cap.
-  // // every 65536 instructions
-  // if ((stats::instructions & 0xFFFFU) != 0 &&
-  //     maxNewWriteableOSSize < OSCopySizeMemoryCheckThreshold &&
-
-  //     maxNewStateStackSize < StackCopySizeMemoryCheckThreshold)
-  //   return None;
-
-  // // check memory limit
-
-  // const auto totalUsage = getMemoryUsage() >> 20U;
-
-  // if (MemoryTriggerCoverOnTheFly && totalUsage > MaxMemory * 0.75) {
-  //   klee_warning_once(0,
-  //                     "enabling cover-on-the-fly (close to memory cap: %luMB)",
-  //                     totalUsage);
-  //   coverOnTheFly = CoverOnTheFly;
-  // }
-
-  // just guess at how many to kill
   auto states = objectManager->getStates();
   const auto numStates = states.size();
 
+  // We need to avoid calling GetTotalMallocUsage() often because it
+  // is O(elts on freelist). This is really bad since we start
+  // to pummel the freelist once we hit the memory cap.
+  // every 65536 instructions
+  if ((stats::instructions & 0xFFFFU) != 0 || numStates > 1000)
+    return None;
+
+  // check memory limit
+
+  const auto totalUsage = getMemoryUsage() >> 20U;
+
+  if (MemoryTriggerCoverOnTheFly && totalUsage > MaxMemory * 0.75) {
+    klee_warning_once(0,
+                      "enabling cover-on-the-fly (close to memory cap: %luMB)",
+                      totalUsage);
+    coverOnTheFly = CoverOnTheFly;
+  }
+
+  // just guess at how many to kill
   // only terminate states when threshold (+1%) exceeded
-  if (numStates < 500) {
+  if (totalUsage < MaxMemory * 0.6 && numStates < 500) {
     return Executor::Low;
-  } else if (numStates <= 1000) {
+  } else if (totalUsage <= MaxMemory * 1.01 && numStates <= 1000) {
     return Executor::High;
   }
 
