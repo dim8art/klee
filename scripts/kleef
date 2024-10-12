@@ -50,7 +50,7 @@ def klee_options(
         "--output-istats=false",
         # "--istats-write-interval=90s", # Istats file can be large as well
         "--write-xml-tests",  # Write tests in XML format
-        f"--write-ktests={write_ktests}", # Write tests in KTest format
+        f"--write-ktests={write_ktests}",  # Write tests in KTest format
         f"--xml-metadata-programfile={source.name}",  # Provide the name of the original source file
         f"--xml-metadata-programhash={hexhash}",  # Provide sha256 hash of source file
         # "--use-guided-search=none",
