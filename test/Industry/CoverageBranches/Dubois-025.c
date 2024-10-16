@@ -3,6 +3,8 @@
 // REQUIRES: target-x86_64
 // RUN: %kleef --property-file=%S/coverage-branches.prp --max-memory=7000000000 --max-cputime-soft=90 --32 --write-ktests %s 2>&1 | FileCheck %s
 
+// CHECK: KLEE: done: generated tests = 2
+
 // This file is part of the SV-Benchmarks collection of verification tasks:
 // https://github.com/sosy-lab/sv-benchmarks
 //
