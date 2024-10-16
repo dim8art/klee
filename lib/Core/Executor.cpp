@@ -4448,7 +4448,7 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
   const auto totalUsage = getMemoryUsage() >> 20U;
   lastTotalMemoryUsage = totalUsage;
   const auto weightOfState = std::max(1UL, totalUsage / numStates);
-  const auto maxNumStates = MaxMemory / weightOfState;
+  const auto maxNumStates = std::max(1UL, MaxMemory / weightOfState);
 
   if (MemoryTriggerCoverOnTheFly && totalUsage > MaxMemory * 0.75) {
     klee_warning_once(0,
@@ -4571,7 +4571,7 @@ void Executor::getKTestFilesInDir(std::string directoryPath,
 std::vector<ExecutingSeed> Executor::uploadNewSeeds() {
   // just guess at how many to kill
   auto states = objectManager->getStates();
-  const auto numStates = states.size();
+  const auto numStates = std::max(1UL, states.size());
   const auto weightOfState = std::max(1UL, lastTotalMemoryUsage / numStates);
   std::vector<ExecutingSeed> seeds;
   unsigned long numStoredSeeds = storedSeeds->size();
