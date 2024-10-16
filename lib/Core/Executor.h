@@ -134,8 +134,7 @@ private:
   decltype(__ctype_toupper_loc()) c_type_toupper_addr;
 #endif
 
-  size_t maxNewWriteableOSSize = 0;
-  size_t maxNewStateStackSize = 0;
+  size_t lastTotalMemoryUsage = 0;
 
   size_t multiplexReached = 0;
 
@@ -271,7 +270,7 @@ private:
                    std::vector<ExecutingSeed> usingSeeds);
 
   bool storeState(const ExecutionState &state, bool isCompleted,
-                           ExecutingSeed &res);
+                  ExecutingSeed &res);
 
   void run(ExecutionState *initialState);
 

@@ -345,19 +345,6 @@ cl::opt<bool> ExploreCompletedSeeds(
     cl::desc("Explore seeds created from completed paths (default=true)"),
     cl::init(true), cl::cat(SeedingCat));
 
-cl::opt<unsigned>
-    UploadAmount("upload-amount",
-                 cl::desc("Amount of seeds that are uploaded every time "
-                          "seeding begins, 0 = upload all (default=0)"),
-                 cl::init(0), cl::cat(SeedingCat));
-
-cl::opt<unsigned> UploadPercentage(
-    "upload-percentage",
-    cl::desc(
-        "Percentage of seeds stored in executor, that are uploaded every time"
-        "seeding begins, 0 = disabled (default=100)"),
-    cl::init(100), cl::cat(SeedingCat));
-
 cl::opt<bool> AlwaysOutputSeeds(
     "always-output-seeds", cl::init(true),
     cl::desc(
@@ -2900,12 +2887,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       Executor::StatePair branches =
           fork(state, cond, ifTrueBlock, ifFalseBlock, BranchType::Conditional);
 
-      if (branches.first && branches.second) {
-        maxNewStateStackSize =
-            std::max(maxNewStateStackSize,
-                     branches.first->stack.stackRegisterSize() * 8);
-      }
-
       // NOTE: There is a hidden dependency here, markBranchVisited
       // requires that we still be in the context of the branch
       // instruction (it reuses its statistic id). Should be cleaned
@@ -4459,12 +4440,15 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
   // is O(elts on freelist). This is really bad since we start
   // to pummel the freelist once we hit the memory cap.
   // every 65536 instructions
-  if ((stats::instructions & 0xFFFFU) != 0 || numStates > 1000)
+  if ((stats::instructions & 0xFFFFU) != 0)
     return None;
 
   // check memory limit
 
   const auto totalUsage = getMemoryUsage() >> 20U;
+  lastTotalMemoryUsage = totalUsage;
+  const auto weightOfState = std::max(1UL, totalUsage / numStates);
+  const auto maxNumStates = MaxMemory / weightOfState;
 
   if (MemoryTriggerCoverOnTheFly && totalUsage > MaxMemory * 0.75) {
     klee_warning_once(0,
@@ -4475,9 +4459,9 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
 
   // just guess at how many to kill
   // only terminate states when threshold (+1%) exceeded
-  if (totalUsage < MaxMemory * 0.6 && numStates < 500) {
+  if (totalUsage < MaxMemory * 0.6 && numStates < maxNumStates * 0.6) {
     return Executor::Low;
-  } else if (totalUsage <= MaxMemory * 1.01 && numStates <= 1000) {
+  } else if (totalUsage <= MaxMemory * 1.01 && 2 * numStates <= maxNumStates) {
     return Executor::High;
   }
 
@@ -4488,13 +4472,12 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
       arr.push_back(state);
     }
   }
-  int arrToKill = arr.size() - 750;
-  arrToKill = std::abs(arrToKill);
-  auto toKill = std::min(arrToKill, 0);
+  auto toKill = std::max(1UL, numStates - numStates * MaxMemory / totalUsage);
+  toKill = std::max(toKill, numStates * numStates / maxNumStates);
 
   if (toKill != 0) {
-    klee_warning("killing %lu states (over memory cap: %luMB)", toKill,
-                 0);
+    klee_warning("killing %lu states (total memory usage: %luMB)", toKill,
+                 totalUsage);
   }
 
   for (unsigned i = 0, N = arr.size(); N > 0 && i < toKill; ++i, --N) {
@@ -4589,21 +4572,14 @@ std::vector<ExecutingSeed> Executor::uploadNewSeeds() {
   // just guess at how many to kill
   auto states = objectManager->getStates();
   const auto numStates = states.size();
+  const auto weightOfState = std::max(1UL, lastTotalMemoryUsage / numStates);
   std::vector<ExecutingSeed> seeds;
-  long diff = 750 - numStates;
-  diff = std::abs(diff);
-  long numStoredSeeds = storedSeeds->size();
-  unsigned toUpload = std::min(numStoredSeeds, diff);
+  unsigned long numStoredSeeds = storedSeeds->size();
+  unsigned toUpload =
+      std::min(numStoredSeeds, MaxMemory / weightOfState - numStates);
 
-  //FIX: experimental option + storedseedslocally behaviour (yes, no, mixed)
-  // unsigned toUpload = UploadAmount;
-  // if(UploadPercentage){
-  //   toUpload = (storedSeeds->size() * UploadPercentage) / 100;
-  //   if(toUpload == 0) toUpload = 1;
-  // }
   if (StoreSeedsLocally) {
-    while ((!toUpload || seeds.size() <= toUpload) &&
-           !storedSeeds->empty()) {
+    while ((!toUpload || seeds.size() <= toUpload) && !storedSeeds->empty()) {
       if (ExploreCompletedSeeds || !storedSeeds->front().isCompleted) {
         seeds.push_back(storedSeeds->front());
       }
@@ -4924,9 +4900,6 @@ void Executor::goForward(ref<ForwardAction> action) {
     terminateStateEarly(state, "max-sym-cycles exceeded.",
                         StateTerminationType::MaxCycles);
   } else if (!fa->state->isSeeded || !reachedMaxSeedInstructions(fa->state)) {
-    maxNewWriteableOSSize = 0;
-    maxNewStateStackSize = 0;
-
     KInstruction *ki = state.pc;
     stepInstruction(state);
     executeInstruction(state, ki);
@@ -5076,7 +5049,8 @@ void Executor::terminateStateEarly(ExecutionState &state, const Twine &message,
   if (RunForever && reason == StateTerminationType::OutOfMemory) {
     if (StoreSeedsLocally) {
       ExecutingSeed seed;
-      bool success = storeState(state, !(reason <= StateTerminationType::EARLY), seed);
+      bool success =
+          storeState(state, !(reason <= StateTerminationType::EARLY), seed);
       if (success) {
         storedSeeds->push_back(seed);
       }
@@ -5088,15 +5062,15 @@ void Executor::terminateStateEarly(ExecutionState &state, const Twine &message,
               reason <= StateTerminationType::EXECERR);
     }
   } else if (((reason <= StateTerminationType::EARLY ||
-        reason == StateTerminationType::MissedAllTargets) &&
-       shouldWriteTest(state)) ||
-    (AlwaysOutputSeeds && seedMap->count(&state))) {
+               reason == StateTerminationType::MissedAllTargets) &&
+              shouldWriteTest(state)) ||
+             (AlwaysOutputSeeds && seedMap->count(&state))) {
     state.clearCoveredNew();
     interpreterHandler->processTestCase(
-      state, (message + "\n").str().c_str(),
-      terminationTypeFileExtension(reason).c_str(),
-      reason > StateTerminationType::EARLY &&
-          reason <= StateTerminationType::EXECERR);
+        state, (message + "\n").str().c_str(),
+        terminationTypeFileExtension(reason).c_str(),
+        reason > StateTerminationType::EARLY &&
+            reason <= StateTerminationType::EXECERR);
   }
   terminateState(state, reason);
 }
@@ -6515,8 +6489,6 @@ void Executor::executeMemoryOperation(
       }
       if (isWrite) {
         ObjectState *wos = state->addressSpace.getWriteable(mo, os);
-        maxNewWriteableOSSize =
-            std::max(maxNewWriteableOSSize, wos->getSparseStorageEntries());
         wos->getDynamicType()->handleMemoryAccess(
             targetType, offset,
             ConstantExpr::alloc(size, Context::get().getPointerWidth()), true);
@@ -6631,8 +6603,6 @@ void Executor::executeMemoryOperation(
           const ObjectState *os = op.second.get();
 
           ObjectState *wos = state->addressSpace.getWriteable(mo, os);
-          maxNewWriteableOSSize =
-              std::max(maxNewWriteableOSSize, wos->getSparseStorageEntries());
           if (wos->readOnly) {
             branches =
                 forkInternal(*state, resolveConditions[i], BranchType::MemOp);
@@ -6716,8 +6686,6 @@ void Executor::executeMemoryOperation(
 
       if (isWrite) {
         ObjectState *wos = bound->addressSpace.getWriteable(mo, os);
-        maxNewWriteableOSSize =
-            std::max(maxNewWriteableOSSize, wos->getSparseStorageEntries());
         wos->getDynamicType()->handleMemoryAccess(
             targetType, offset,
             ConstantExpr::alloc(size, Context::get().getPointerWidth()), true);
@@ -7860,8 +7828,6 @@ void Executor::doImpliedValueConcretization(ExecutionState &state, ref<Expr> e,
         assert(!os->readOnly &&
                "not possible? read only object with static read?");
         ObjectState *wos = state.addressSpace.getWriteable(mo, os);
-        maxNewWriteableOSSize =
-            std::max(maxNewWriteableOSSize, wos->getSparseStorageEntries());
         wos->write(CE, it->second);
       }
     }
