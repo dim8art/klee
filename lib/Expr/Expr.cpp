@@ -577,8 +577,7 @@ Expr::~Expr() {
   }
 }
 
-ConstantExpr::~ConstantExpr() {
-}
+ConstantExpr::~ConstantExpr() {}
 
 ref<Expr> Expr::createCachedExpr(ref<Expr> e) {
   std::pair<CacheType::const_iterator, bool> success;
