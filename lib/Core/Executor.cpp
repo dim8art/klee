@@ -4502,7 +4502,7 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
       arr.push_back(state);
     }
   }
-  auto toKill = std::min(arr.size() / 2);
+  auto toKill = arr.size() / 2;
 
   if (toKill != 0) {
     klee_warning("killing %lu states (over memory cap: %luMB)", toKill,
