@@ -4502,8 +4502,7 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
       arr.push_back(state);
     }
   }
-  auto toKill =
-      std::min(arr.size(), numStates - numStates * MaxMemory / totalUsage);
+  auto toKill = std::min(arr.size() / 2);
 
   if (toKill != 0) {
     klee_warning("killing %lu states (over memory cap: %luMB)", toKill,
@@ -5078,12 +5077,7 @@ void Executor::terminateStateEarly(ExecutionState &state, const Twine &message,
     assert(reason > StateTerminationType::EXIT);
     ++stats::terminationEarly;
   }
-  if ((RunForever && reason == StateTerminationType::OutOfMemory) ||
-      ((reason <= StateTerminationType::EARLY ||
-        reason == StateTerminationType::MissedAllTargets) &&
-       shouldWriteTest(state)) ||
-      (AlwaysOutputSeeds && seedMap->count(&state))) {
-    state.clearCoveredNew();
+  if (RunForever && reason == StateTerminationType::OutOfMemory) {
     if (StoreSeedsLocally) {
       ExecutingSeed seed;
       bool success = storeState(state, !(reason <= StateTerminationType::EARLY), seed);
@@ -5097,6 +5091,16 @@ void Executor::terminateStateEarly(ExecutionState &state, const Twine &message,
           reason > StateTerminationType::EARLY &&
               reason <= StateTerminationType::EXECERR);
     }
+  } else if (((reason <= StateTerminationType::EARLY ||
+        reason == StateTerminationType::MissedAllTargets) &&
+       shouldWriteTest(state)) ||
+    (AlwaysOutputSeeds && seedMap->count(&state))) {
+    state.clearCoveredNew();
+    interpreterHandler->processTestCase(
+      state, (message + "\n").str().c_str(),
+      terminationTypeFileExtension(reason).c_str(),
+      reason > StateTerminationType::EARLY &&
+          reason <= StateTerminationType::EXECERR);
   }
   terminateState(state, reason);
 }
