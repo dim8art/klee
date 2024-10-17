@@ -292,6 +292,7 @@ BitwuzlaSolverImpl::BitwuzlaSolverImpl()
   assert(builder && "unable to create BitwuzlaBuilder");
 
   solverParameters.set(Option::PRODUCE_MODELS, true);
+  solverParameters.set(Option::MEMORY_LIMIT, 2048);
 
   setCoreSolverTimeout(timeout);
 
