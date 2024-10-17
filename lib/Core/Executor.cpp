@@ -4434,13 +4434,16 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
     return None;
 
   auto states = objectManager->getStates();
-  const auto numStates = states.size();
+  const auto numStates = std::max(1UL, states.size());
+  const auto lastWeightOfState =
+      std::max(1UL, lastTotalMemoryUsage / numStates);
+  const auto lastMaxNumStates = std::max(1UL, MaxMemory / lastWeightOfState);
 
   // We need to avoid calling GetTotalMallocUsage() often because it
   // is O(elts on freelist). This is really bad since we start
   // to pummel the freelist once we hit the memory cap.
   // every 65536 instructions
-  if ((stats::instructions & 0xFFFFU) != 0)
+  if ((stats::instructions & 0xFFFFU) != 0 && 2 * numStates < lastMaxNumStates)
     return None;
 
   // check memory limit
