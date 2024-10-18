@@ -4434,7 +4434,10 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
     return None;
 
   auto states = objectManager->getStates();
-  const auto numStates = std::max(1UL, states.size());
+  const auto numStates = states.size();
+  if (numStates == 0) {
+    return None;
+  }
   const auto lastWeightOfState =
       std::max(1UL, lastTotalMemoryUsage / numStates);
   const auto lastMaxNumStates = std::max(1UL, MaxMemory / lastWeightOfState);
@@ -4443,7 +4446,7 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
   // is O(elts on freelist). This is really bad since we start
   // to pummel the freelist once we hit the memory cap.
   // every 65536 instructions
-  if ((stats::instructions & 0xFFFFU) != 0 && 2 * numStates < lastMaxNumStates)
+  if ((stats::instructions & 0xFFFFU) != 0 && 8 * numStates < lastMaxNumStates)
     return None;
 
   // check memory limit
@@ -4464,7 +4467,7 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
   // only terminate states when threshold (+1%) exceeded
   if (totalUsage < MaxMemory * 0.6 && numStates < maxNumStates * 0.6) {
     return Executor::Low;
-  } else if (totalUsage <= MaxMemory * 1.01 && 2 * numStates <= maxNumStates) {
+  } else if (totalUsage <= MaxMemory * 1.01 && 8 * numStates <= maxNumStates) {
     return Executor::High;
   }
 
@@ -4477,6 +4480,7 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
   }
   auto toKill = std::max(1UL, numStates - numStates * MaxMemory / totalUsage);
   toKill = std::max(toKill, numStates * numStates / maxNumStates);
+  toKill = std::min(toKill, numStates - 1);
 
   if (toKill != 0) {
     klee_warning("killing %lu states (total memory usage: %luMB)", toKill,
