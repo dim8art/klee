@@ -6932,8 +6932,9 @@ void Executor::executeMakeSymbolic(ExecutionState &state,
             si.assignment.bindings.replace(
                 {array, SparseStorageImpl<unsigned char>(0)});
           } else if (!AllowSeedExtension) {
-            terminateStateOnUserError(state,
-                                      "ran out of inputs during seeding");
+            // terminateStateOnUserError(state,
+            //                           "ran out of inputs during seeding");
+            objectManager->unseed(&state);
             break;
           }
         } else {
