@@ -4435,7 +4435,7 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
 
   auto states = objectManager->getStates();
   const auto numStates = states.size();
-  if (numStates == 0) {
+  if (numStates < 5) {
     return None;
   }
   const auto lastWeightOfState =
