@@ -200,6 +200,10 @@ private:
   /// object.
   unsigned replayPosition;
 
+  /// When non-null a list of "seed" inputs which will be used to
+  /// drive execution.
+  std::vector<ExecutingSeed> usingInitialSeeds;
+
   /// Disables forking, instead a random path is chosen. Enabled as
   /// needed to control memory usage. \see fork()
   bool atMemoryLimit;
@@ -261,16 +265,11 @@ private:
 
   void executeInstruction(ExecutionState &state, KInstruction *ki);
 
-  states_ty &getSeedChanges() { return objectManager->getSeedChanges(); }
-
-  void getKTestFilesInDir(std::string directoryPath,
-                          std::vector<std::string> &results);
   std::vector<ExecutingSeed> uploadNewSeeds();
   void initialSeed(ExecutionState &initialState,
                    std::vector<ExecutingSeed> usingSeeds);
 
-  bool storeState(const ExecutionState &state, bool isCompleted,
-                  ExecutingSeed &res);
+  bool storeState(const ExecutionState &state, ExecutingSeed &res);
 
   void run(ExecutionState *initialState);
 
@@ -785,6 +784,13 @@ public:
 
   void setFunctionsByModule(FunctionsByModule &&functionsByModule) override;
 
+  void useSeeds(std::vector<SeedFromFile> seeds) override {
+    for (SeedFromFile seed : seeds) {
+      usingInitialSeeds.push_back(
+          ExecutingSeed(seed.ktest, seed.maxInstructions));
+    }
+  }
+
   ExecutionState *formState(llvm::Function *f);
   ExecutionState *formState(llvm::Function *f, int argc, char **argv,
                             char **envp);
@@ -853,7 +859,7 @@ public:
   void logState(const ExecutionState &state, int id,
                 std::unique_ptr<llvm::raw_fd_ostream> &f) override;
 
-  bool getSymbolicSolution(const ExecutionState &state, KTest *res) override;
+  bool getSymbolicSolution(const ExecutionState &state, KTest &res) override;
 
   void getCoveredLines(const ExecutionState &state,
                        std::map<std::string, std::set<unsigned>> &res) override;

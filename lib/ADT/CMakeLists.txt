@@ -8,6 +8,7 @@
 #===------------------------------------------------------------------------===#
 add_library(kleeADT
   SparseStorage.cpp
+  SeedFromFile.cpp
 )
 
 llvm_config(kleeADT "${USE_LLVM_SHARED}" support)

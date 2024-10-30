@@ -1,4 +1,4 @@
-//===--SeedInfo.h ----------------------------------------------*- C++ -*-===//
+//=== --SeedInfo.h ----------------------------------------------*- C++ -*-===//
 //
 //                     The KLEE Symbolic Virtual Machine
 //
@@ -30,9 +30,7 @@ public:
   Assignment assignment;
   std::shared_ptr<KTest> input;
   unsigned maxInstructions = 0;
-  bool isCompleted = 0;
   std::set<struct KTestObject *> used;
-  std::string path = "";
   mutable std::deque<ref<box<bool>>> coveredNew;
   mutable ref<box<bool>> coveredNewError = nullptr;
   unsigned inputPosition = 0;
@@ -43,31 +41,20 @@ public:
   ExecutingSeed() {}
 
   explicit ExecutingSeed(KTest *input, unsigned maxInstructions,
-                         bool isCompleted,
-                         std::deque<ref<box<bool>>> coveredNew,
-                         ref<box<bool>> coveredNewError)
+                         std::deque<ref<box<bool>>> coveredNew = {},
+                         ref<box<bool>> coveredNewError = 0)
       : input(input, kTestDeleter), maxInstructions(maxInstructions),
-        isCompleted(isCompleted), coveredNew(coveredNew),
-        coveredNewError(coveredNewError) {}
+        coveredNew(coveredNew), coveredNewError(coveredNewError) {}
 
   explicit ExecutingSeed(Assignment assignment, unsigned maxInstructions,
-                         bool isCompleted,
                          std::deque<ref<box<bool>>> coveredNew,
                          ref<box<bool>> coveredNewError)
       : assignment(assignment), maxInstructions(maxInstructions),
-        isCompleted(isCompleted), coveredNew(coveredNew),
-        coveredNewError(coveredNewError) {}
-
-  ExecutingSeed(std::string _path);
+        coveredNew(coveredNew), coveredNewError(coveredNewError) {}
 
   KTestObject *getNextInput(const MemoryObject *mo, bool byName);
 
-  static void kTestDeleter(KTest *kTest);
-
-  /// Patch the seed so that condition is satisfied while retaining as
-  /// many of the seed values as possible.
-  void patchSeed(const ExecutionState &state, ref<Expr> condition,
-                 TimingSolver *solver);
+  static void kTestDeleter(KTest *ktest);
 };
 } // namespace klee
 

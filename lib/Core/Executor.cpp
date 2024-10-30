@@ -224,6 +224,12 @@ cl::opt<HaltExecution::Reason> DumpStatesOnHalt(
         clEnumValN(HaltExecution::Reason::Unspecified, "all",
                    "Dump test cases for all active states on exit (default)")),
     cl::cat(TestGenCat));
+
+cl::opt<bool> RunForever("run-forever",
+                         cl::desc("Store states when out of memory and explore "
+                                  "them later (default=false)"),
+                         cl::init(false), cl::cat(SeedingCat));
+
 } // namespace klee
 
 namespace {
@@ -330,29 +336,18 @@ cl::opt<bool> AllExternalWarnings(
 
 /*** Seeding options ***/
 
-cl::opt<bool> RunForever("run-forever",
-                         cl::desc("Store states when out of memory and explore "
-                                  "them later (default=false)"),
-                         cl::init(false), cl::cat(SeedingCat));
-
-cl::opt<bool> StoreSeedsLocally("store-seeds-locally",
-                                cl::desc("Partially executed states are stored "
-                                         "locally as ktests (default=false)"),
-                                cl::init(false), cl::cat(SeedingCat));
-
-cl::opt<bool> ExploreCompletedSeeds(
-    "explore-completed-seeds",
-    cl::desc("Explore seeds created from completed paths (default=true)"),
-    cl::init(true), cl::cat(SeedingCat));
+cl::opt<unsigned> UploadPercentage(
+    "upload-percentage",
+    cl::desc(
+        "Percentage of seeds stored in executor, that are uploaded every time"
+        "seeding begins, 0 = disabled (default=100)"),
+    cl::init(100), cl::cat(SeedingCat));
 
 cl::opt<bool> AlwaysOutputSeeds(
     "always-output-seeds", cl::init(true),
     cl::desc(
         "Dump test cases even if they are driven by seeds only (default=true)"),
     cl::cat(SeedingCat));
-
-cl::opt<bool> PatchSeeds("patch-seeds", cl::desc("Patch seeds (default=false)"),
-                         cl::init(false), cl::cat(SeedingCat));
 
 cl::opt<bool> OnlyReplaySeeds(
     "only-replay-seeds", cl::init(false),
@@ -391,15 +386,6 @@ cl::opt<std::string>
              cl::desc("Amount of time to dedicate to seeds, before normal "
                       "search (default=0s (off))"),
              cl::cat(SeedingCat));
-
-cl::list<std::string> SeedOutFile("seed-file",
-                                  cl::desc(".ktest file to be used as seed"),
-                                  cl::cat(SeedingCat));
-
-cl::list<std::string>
-    SeedOutDir("seed-dir",
-               cl::desc("Directory with .ktest files to be used as seeds"),
-               cl::cat(SeedingCat));
 /***/
 
 /*** Debugging options ***/
@@ -1199,11 +1185,14 @@ void Executor::initializeGlobalObjects(ExecutionState &state) {
 
 bool Executor::branchingPermitted(ExecutionState &state, unsigned N) {
   assert(N);
-  if ((MaxMemoryInhibit && atMemoryLimit && !state.isSeeded) ||
+  if (state.isSeeded) {
+    return true;
+  }
+  if ((MaxMemoryInhibit && atMemoryLimit) ||
       state.forkDisabled || inhibitForking ||
       (MaxForks != ~0u && stats::forks >= MaxForks)) {
 
-    if (MaxMemoryInhibit && atMemoryLimit && !state.isSeeded)
+    if (MaxMemoryInhibit && atMemoryLimit)
       klee_warning_once(0, "skipping fork (memory cap exceeded)");
     else if (state.forkDisabled)
       klee_warning_once(0, "skipping fork (fork disabled on current path)");
@@ -1286,7 +1275,6 @@ void Executor::branch(ExecutionState &state,
 
       // Extra check in case we're replaying seeds with a max-fork
       if (result[i]) {
-        objectManager->seed(result[i]);
         seedMap->at(result[i]).push_back(*siit);
       }
     }
@@ -1404,6 +1392,7 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
   }
 
   if (!isSeeding) {
+    assert(seedMap->empty());
     if (replayPath && !isInternal) {
       assert(replayPosition < replayPath->size() &&
              "ran out of branches in replay path mode");
@@ -1621,33 +1610,6 @@ void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
     if (!CE->isTrue())
       llvm::report_fatal_error("attempt to add invalid constraint");
     return;
-  }
-
-  // Check to see if this constraint violates seeds.
-  if (PatchSeeds && state.isSeeded) {
-    std::map<ExecutionState *, std::vector<ExecutingSeed>>::iterator it =
-        seedMap->find(&state);
-    assert(it != seedMap->end());
-    assert(!it->second.empty());
-    bool warn = false;
-    for (std::vector<ExecutingSeed>::iterator siit = it->second.begin(),
-                                              siie = it->second.end();
-         siit != siie; ++siit) {
-      bool res;
-      solver->setTimeout(coreSolverTimeout);
-      bool success = solver->mustBeFalse(state.constraints.cs(),
-                                         siit->assignment.evaluate(condition),
-                                         res, state.queryMetaData);
-      solver->setTimeout(time::Span());
-      assert(success && "FIXME: Unhandled solver failure");
-      (void)success;
-      if (res) {
-        siit->patchSeed(state, condition, solver.get());
-        warn = true;
-      }
-    }
-    if (warn)
-      klee_warning("seeds patched for violating constraint");
   }
 
   state.addConstraint(condition);
@@ -4557,24 +4519,6 @@ const KFunction *Executor::getKFunction(const llvm::Function *f) const {
   return (kfIt == kmodule->functionMap.end()) ? nullptr : kfIt->second;
 }
 
-void Executor::getKTestFilesInDir(std::string directoryPath,
-                                  std::vector<std::string> &results) {
-  std::error_code ec;
-  llvm::sys::fs::directory_iterator i(directoryPath, ec), e;
-  for (; i != e && !ec; i.increment(ec)) {
-    auto f = i->path();
-    if (f.size() >= 6 && f.substr(f.size() - 6, f.size()) == ".ktest") {
-      results.push_back(f);
-    }
-  }
-
-  if (ec) {
-    llvm::errs() << "ERROR: unable to read output directory: " << directoryPath
-                 << ": " << ec.message() << "\n";
-    exit(1);
-  }
-}
-
 std::vector<ExecutingSeed> Executor::uploadNewSeeds() {
   // just guess at how many to kill
   auto states = objectManager->getStates();
@@ -4585,60 +4529,9 @@ std::vector<ExecutingSeed> Executor::uploadNewSeeds() {
   unsigned toUpload =
       std::min(numStoredSeeds, MaxMemory / weightOfState - numStates);
 
-  if (StoreSeedsLocally) {
-    while ((!toUpload || seeds.size() <= toUpload) && !storedSeeds->empty()) {
-      if (ExploreCompletedSeeds || !storedSeeds->front().isCompleted) {
-        seeds.push_back(storedSeeds->front());
-      }
-      storedSeeds->pop_front();
-    }
-    return seeds;
-  }
-
-  if (toUpload && seeds.size() >= toUpload) {
-    return seeds;
-  }
-
-  for (std::vector<std::string>::iterator it = SeedOutFile.begin(),
-                                          ie = SeedOutFile.end();
-       it != ie && (!toUpload || seeds.size() <= toUpload); ++it) {
-    ExecutingSeed out(it->substr(0, it->size() - 5));
-    if (!out.input) {
-      klee_error("unable to open: %s\n", (*it).c_str());
-    } else if (ExploreCompletedSeeds || !out.isCompleted) {
-      seeds.push_back(out);
-    }
-  }
-
-  for (std::vector<std::string>::iterator it = SeedOutDir.begin(),
-                                          ie = SeedOutDir.end();
-       it != ie; ++it) {
-    std::vector<std::string> kTestFiles;
-    getKTestFilesInDir(*it, kTestFiles);
-    for (std::vector<std::string>::iterator it2 = kTestFiles.begin(),
-                                            ie = kTestFiles.end();
-         it2 != ie && (!toUpload || seeds.size() <= toUpload); ++it2) {
-      ExecutingSeed out(it2->substr(0, it2->size() - 5));
-      if (!out.input) {
-        klee_error("unable to open: %s\n", (*it2).c_str());
-      } else if (ExploreCompletedSeeds || !out.isCompleted) {
-        seeds.push_back(out);
-      }
-    }
-    if (kTestFiles.empty() && !RunForever) {
-      llvm::errs() << "seeds directory is empty: " << (*it).c_str() << "\n";
-    }
-  }
-  // FIX: store all seed information like path and early termination reason in
-  // seedinfo file (preferably make it json)
-  for (auto it : seeds) {
-    if (RunForever && !it.path.empty()) {
-      std::remove((it.path + "seedinfo").c_str());
-      std::remove((it.path + "path").c_str());
-      std::remove((it.path + "early").c_str());
-      std::remove((it.path + "ktest").c_str());
-      std::remove((it.path + "xml").c_str());
-    }
+  while ((!toUpload || seeds.size() <= toUpload) && !storedSeeds->empty()) {
+    seeds.push_back(storedSeeds->front());
+    storedSeeds->pop_front();
   }
   return seeds;
 }
@@ -4661,8 +4554,7 @@ void Executor::initialSeed(ExecutionState &initialState,
   objectManager->updateSubscribers();
 }
 
-bool Executor::storeState(const ExecutionState &state, bool isCompleted,
-                          ExecutingSeed &res) {
+bool Executor::storeState(const ExecutionState &state, ExecutingSeed &res) {
   ref<SolverResponse> response;
   bool success =
       solver->getResponse(state.constraints.cs(), Expr::createFalse(), response,
@@ -4676,8 +4568,8 @@ bool Executor::storeState(const ExecutionState &state, bool isCompleted,
     assert(false && "terminated state must have an assignment");
     return false;
   }
-  ExecutingSeed seed(assignment, state.steppedInstructions, isCompleted,
-                     state.coveredNew, state.coveredNewError);
+  ExecutingSeed seed(assignment, state.steppedInstructions, state.coveredNew,
+                     state.coveredNewError);
   res = seed;
   return true;
 }
@@ -4859,7 +4751,9 @@ bool Executor::reachedMaxSeedInstructions(ExecutionState *state) {
 
   std::vector<ExecutingSeed>::iterator siit = it->second.begin();
   if (siit->maxInstructions &&
-      siit->maxInstructions >= state->steppedInstructions) {
+      siit->maxInstructions <= state->steppedInstructions) {
+    assert(siit->maxInstructions == state->steppedInstructions &&
+           "state stepped instructions exceeded seed max instructions");
     state->coveredNew = siit->coveredNew;
     if (siit->coveredNewError) {
       state->coveredNewError = siit->coveredNewError;
@@ -5053,11 +4947,15 @@ void Executor::terminateStateEarly(ExecutionState &state, const Twine &message,
     assert(reason > StateTerminationType::EXIT);
     ++stats::terminationEarly;
   }
-  if (RunForever && reason == StateTerminationType::OutOfMemory) {
-    if (StoreSeedsLocally) {
+  if ((RunForever && (reason <= StateTerminationType::EARLY)) ||
+      ((reason <= StateTerminationType::EARLY ||
+        reason == StateTerminationType::MissedAllTargets) &&
+       shouldWriteTest(state)) ||
+      (AlwaysOutputSeeds && seedMap->count(&state))) {
+    state.clearCoveredNew();
+    if (RunForever && (reason <= StateTerminationType::EARLY) ) {
       ExecutingSeed seed;
-      bool success =
-          storeState(state, !(reason <= StateTerminationType::EARLY), seed);
+      bool success = storeState(state, seed);
       if (success) {
         storedSeeds->push_back(seed);
       }
@@ -7580,7 +7478,7 @@ bool isMakeSymbolicSymbol(const klee::Symbolic &symb) {
   return good;
 }
 
-bool Executor::getSymbolicSolution(const ExecutionState &state, KTest *res) {
+bool Executor::getSymbolicSolution(const ExecutionState &state, KTest &res) {
   solver->setTimeout(coreSolverTimeout);
 
   PathConstraints extendedConstraints(state.constraints);
@@ -7764,18 +7662,11 @@ bool Executor::getSymbolicSolution(const ExecutionState &state, KTest *res) {
     }
   }
 
-  res->numArgs = interpreterHandler->argc();
-  res->args = (char **)calloc(res->numArgs, sizeof(*res->args));
-  for (unsigned i = 0; i < res->numArgs; i++) {
-    unsigned argsize = std::strlen(interpreterHandler->argv()[i]);
-    res->args[i] = (char *)calloc(argsize + 1, sizeof(*res->args[i]));
-    std::strcpy(res->args[i], interpreterHandler->argv()[i]);
-  }
-  res->symArgvs = 0;
-  res->symArgvLen = 0;
-  res->numObjects = symbolics.size();
-  res->objects = (KTestObject *)calloc(res->numObjects, sizeof(*res->objects));
-  res->uninitCoeff = uninitObjects.size() * UninitMemoryTestMultiplier;
+  res.symArgvs = 0;
+  res.symArgvLen = 0;
+  res.numObjects = symbolics.size();
+  res.objects = (KTestObject *)calloc(res.numObjects, sizeof(*res.objects));
+  res.uninitCoeff = uninitObjects.size() * UninitMemoryTestMultiplier;
 
   {
     size_t i = 0;
@@ -7783,7 +7674,7 @@ bool Executor::getSymbolicSolution(const ExecutionState &state, KTest *res) {
     for (auto &symbolic : symbolics) {
       auto mo = symbolic.memoryObject;
       auto &values = model.bindings.at(symbolic.array);
-      KTestObject *o = &res->objects[i];
+      KTestObject *o = &res.objects[i];
       o->name = (char *)calloc(mo->name.size() + 1, sizeof(*o->name));
       std::strcpy(o->name, mo->name.c_str());
       o->address = cast<ConstantExpr>(evaluator.visit(mo->getBaseExpr()))
@@ -7800,7 +7691,7 @@ bool Executor::getSymbolicSolution(const ExecutionState &state, KTest *res) {
     }
   }
 
-  setInitializationGraph(state, symbolics, model, *res);
+  setInitializationGraph(state, symbolics, model, res);
 
   return true;
 }

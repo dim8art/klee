@@ -13,7 +13,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <fstream>
 
 #define KTEST_VERSION 4
 #define KTEST_MAGIC_SIZE 5
@@ -297,7 +296,7 @@ void kTest_free(KTest *bo) {
   free(bo);
 }
 
-unsigned getkTestMemoryUsage(KTest *ktest) {
+unsigned getKTestMemoryUsage(KTest *ktest) {
   size_t size = 0;
   for (unsigned i = 0; i < ktest->numObjects; i++) {
     size += std::strlen(ktest->objects[i].name) * sizeof(char);
