@@ -5,7 +5,7 @@ on:
   pull_request:
     branches: [main, utbot-main]
   push:
-   branches: [main, utbot-main, testheheh]
+    branches: [main, utbot-main, testheheh]
   workflow_dispatch:
     inputs:
       warnings_as_errors:

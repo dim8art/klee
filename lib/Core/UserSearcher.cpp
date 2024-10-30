@@ -16,6 +16,8 @@
 
 #include "llvm/Support/CommandLine.h"
 
+#include <string>
+
 using namespace llvm;
 using namespace klee;
 
@@ -68,12 +70,6 @@ cl::opt<bool> UseBatchingSearch(
              "(default=false)"),
     cl::init(false), cl::cat(SearchCat));
 
-cl::opt<bool>
-    UseSeededSearch("use-seeded-search",
-                    cl::desc("Use seeded searcher (explores seeded states "
-                             "before unseeded) (default=false)"),
-                    cl::init(false), cl::cat(SearchCat));
-
 cl::opt<unsigned> BatchInstructions(
     "batch-instructions",
     cl::desc("Number of instructions to batch when using "
@@ -93,6 +89,12 @@ cl::opt<bool> UseFairSearch(
         "(default=false)"),
     cl::init(false), cl::cat(SearchCat));
 
+} // namespace klee
+
+namespace klee {
+extern cl::opt<bool> RunForever;
+extern cl::list<std::string> SeedOutFile;
+extern cl::list<std::string> SeedOutDir;
 } // namespace klee
 
 void klee::initializeSearchOptions() {
@@ -205,12 +207,9 @@ Searcher *klee::constructUserSearcher(Executor &executor) {
   } else {
     searcher = constructBaseSearcher(executor);
   }
-
-  if (UseSeededSearch) {
-    states_ty &seedChandes = executor.getSeedChanges();
-    searcher = new SeededSearcher(searcher, seedChandes);
+  if(RunForever){
+    searcher = new SeededSearcher(searcher);
   }
-
   llvm::raw_ostream &os = executor.getHandler().getInfoStream();
 
   os << "BEGIN searcher description\n";

@@ -423,12 +423,11 @@ public:
 class SeededSearcher final : public Searcher {
   std::unique_ptr<Searcher> baseSearcher;
   std::unique_ptr<BFSSearcher> seededSearcher;
-  states_ty &seedChanges;
   states_ty baseSearcherStates;
   states_ty seededSearcherStates;
 
 public:
-  explicit SeededSearcher(Searcher *_searcher, states_ty &_seedChanges);
+  explicit SeededSearcher(Searcher *_searcher);
 
   ExecutionState &selectState() override;
 
