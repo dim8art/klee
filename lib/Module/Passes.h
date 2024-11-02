@@ -15,7 +15,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
-#include <llvm-14/llvm/IR/IntrinsicInst.h>
+#include "llvm/IR/IntrinsicInst.h"
 #include <unordered_set>
 
 namespace llvm {
