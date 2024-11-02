@@ -10,6 +10,8 @@
 #ifndef KLEE_SEEDINFO_H
 #define KLEE_SEEDINFO_H
 
+#include "ExecutionState.h"
+#include "klee/ADT/ImmutableList.h"
 #include "klee/Expr/Assignment.h"
 
 #include <deque>
@@ -27,7 +29,7 @@ class MemoryObject;
 
 class ExecutingSeed {
 public:
-  Assignment assignment;
+  mutable Assignment assignment;
   std::shared_ptr<KTest> input;
   unsigned maxInstructions = 0;
   std::set<struct KTestObject *> used;

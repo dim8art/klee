@@ -268,7 +268,7 @@ private:
   void initialSeed(ExecutionState &initialState,
                    std::vector<ExecutingSeed> usingSeeds);
 
-  bool storeState(const ExecutionState &state, ExecutingSeed &res);
+  void storeState(const ExecutionState &state, ExecutingSeed &res);
 
   void run(ExecutionState *initialState);
 

@@ -419,18 +419,12 @@ cl::opt<SAMultiplexKind> MultiplexForStaticAnalysis(
 
 namespace klee {
 
-cl::list<std::string> SeedOutFile("seed-file",
-                                  cl::desc(".ktest file to be used as seed"),
-                                  cl::cat(SeedingCat));
-
-cl::list<std::string>
-    SeedOutDir("seed-dir",
-               cl::desc("Directory with .ktest files to be used as seeds"),
-               cl::cat(SeedingCat));
-
+extern cl::list<std::string> SeedOutFile;
+extern cl::list<std::string> SeedOutDir;
 extern cl::opt<std::string> MaxTime;
 extern cl::opt<std::string> FunctionCallReproduce;
 extern cl::opt<HaltExecution::Reason> DumpStatesOnHalt;
+
 class ExecutionState;
 } // namespace klee
 

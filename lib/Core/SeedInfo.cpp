@@ -24,7 +24,8 @@ using namespace klee;
 
 void ExecutingSeed::kTestDeleter(KTest *ktest) { kTest_free(ktest); }
 
-KTestObject *ExecutingSeed::getNextInput(const MemoryObject *mo, bool byName) {
+KTestObject *ExecutingSeed::getNextInput(const MemoryObject *mo,
+                                         bool byName) {
   if (!input)
     return nullptr;
 
