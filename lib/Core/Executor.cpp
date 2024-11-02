@@ -229,7 +229,14 @@ cl::opt<bool> RunForever("run-forever",
                          cl::desc("Store states when out of memory and explore "
                                   "them later (default=false)"),
                          cl::init(false), cl::cat(SeedingCat));
+cl::list<std::string>
+    SeedOutDir("seed-dir",
+               cl::desc("Directory with .ktest files to be used as seeds"),
+               cl::cat(SeedingCat));
 
+cl::list<std::string> SeedOutFile("seed-file",
+                                  cl::desc(".ktest file to be used as seed"),
+                                  cl::cat(SeedingCat));
 } // namespace klee
 
 namespace {
@@ -1243,18 +1250,16 @@ void Executor::branch(ExecutionState &state,
   }
 
   if (state.isSeeded) {
-    std::map<ExecutionState *, std::vector<ExecutingSeed>>::iterator it =
-        seedMap->find(&state);
+    std::map<ExecutionState *, seeds_ty>::iterator it = seedMap->find(&state);
     assert(it != seedMap->end());
     assert(!it->second.empty());
-    std::vector<ExecutingSeed> seeds = it->second;
+    seeds_ty seeds = it->second;
     seedMap->erase(it);
     objectManager->unseed(it->first);
     // Assume each seed only satisfies one condition (necessarily true
     // when conditions are mutually exclusive and their conjunction is
     // a tautology).
-    for (std::vector<ExecutingSeed>::iterator siit = seeds.begin(),
-                                              siie = seeds.end();
+    for (seeds_ty::iterator siit = seeds.begin(), siie = seeds.end();
          siit != siie; ++siit) {
       unsigned i;
       for (i = 0; i < N; ++i) {
@@ -1275,7 +1280,7 @@ void Executor::branch(ExecutionState &state,
 
       // Extra check in case we're replaying seeds with a max-fork
       if (result[i]) {
-        seedMap->at(result[i]).push_back(*siit);
+        seedMap->at(result[i]).insert(*siit);
       }
     }
   }
@@ -1381,8 +1386,8 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
   bool isInternal = ifTrueBlock == ifFalseBlock;
   PartialValidity res = PartialValidity::None;
   bool isSeeding = current.isSeeded;
-  std::vector<ExecutingSeed> trueSeeds;
-  std::vector<ExecutingSeed> falseSeeds;
+  seeds_ty trueSeeds;
+  seeds_ty falseSeeds;
   time::Span timeout = coreSolverTimeout;
   bool shouldCheckTrueBlock = true, shouldCheckFalseBlock = true;
 
@@ -1406,13 +1411,11 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
       }
     }
   } else {
-    std::map<ExecutionState *, std::vector<ExecutingSeed>>::iterator it =
-        seedMap->find(&current);
+    std::map<ExecutionState *, seeds_ty>::iterator it = seedMap->find(&current);
     assert(it != seedMap->end());
     assert(!it->second.empty());
     timeout *= static_cast<unsigned>(it->second.size());
-    for (std::vector<ExecutingSeed>::iterator siit = it->second.begin(),
-                                              siie = it->second.end();
+    for (seeds_ty::iterator siit = it->second.begin(), siie = it->second.end();
          siit != siie; ++siit) {
       ref<ConstantExpr> result;
       bool success = solver->getValue(current.constraints.cs(),
@@ -1421,9 +1424,9 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
       assert(success && "FIXME: Unhandled solver failure");
       (void)success;
       if (result->isTrue()) {
-        trueSeeds.push_back(*siit);
+        trueSeeds.insert(*siit);
       } else if (result->isFalse()) {
-        falseSeeds.push_back(*siit);
+        falseSeeds.insert(*siit);
       }
     }
     if (!trueSeeds.empty() && falseSeeds.empty()) {
@@ -1747,13 +1750,11 @@ void Executor::executeGetValue(ExecutionState &state, ref<Expr> e,
     (void)success;
     bindLocal(target, state, value);
   } else {
-    std::map<ExecutionState *, std::vector<ExecutingSeed>>::iterator it =
-        seedMap->find(&state);
+    std::map<ExecutionState *, seeds_ty>::iterator it = seedMap->find(&state);
     assert(it != seedMap->end());
     assert(!it->second.empty());
     std::set<ref<Expr>> values;
-    for (std::vector<ExecutingSeed>::iterator siit = it->second.begin(),
-                                              siie = it->second.end();
+    for (seeds_ty::iterator siit = it->second.begin(), siie = it->second.end();
          siit != siie; ++siit) {
       ref<Expr> cond = siit->assignment.evaluate(e);
       cond = optimizer.optimizeExpr(cond, true);
@@ -4538,16 +4539,14 @@ std::vector<ExecutingSeed> Executor::uploadNewSeeds() {
 
 void Executor::initialSeed(ExecutionState &initialState,
                            std::vector<ExecutingSeed> usingSeeds) {
-  // FIX: better file managment when seeding + flag if all seeds are completed
-
   if (usingSeeds.empty()) {
     return;
   }
-  std::vector<ExecutingSeed> &v = seedMap->at(&initialState);
+  seeds_ty &v = seedMap->at(&initialState);
   for (std::vector<ExecutingSeed>::const_iterator it = usingSeeds.begin(),
                                                   ie = usingSeeds.end();
        it != ie; ++it) {
-    v.push_back(*it);
+    v.insert(*it);
   }
   klee_message("Seeding began using %ld seeds!\n", usingSeeds.size());
   objectManager->seed(&initialState);
@@ -4745,27 +4744,38 @@ bool Executor::reachedMaxSeedInstructions(ExecutionState *state) {
   assert(state->isSeeded);
   auto it = seedMap->find(state);
   assert(it != seedMap->end());
-  if (it->second.size() != 1) {
+
+  seeds_ty &seeds = it->second;
+
+  assert(!seeds.empty());
+  assert(seeds.begin()->maxInstructions >= state->steppedInstructions &&
+         "state stepped instructions exceeded seed max instructions");
+
+  seeds_ty::iterator siit = seeds.begin();
+  if (siit->maxInstructions &&
+      siit->maxInstructions == state->steppedInstructions) {
+    if (seeds.size() == 1) {
+      state->coveredNew = siit->coveredNew;
+      if (siit->coveredNewError) {
+        state->coveredNewError = siit->coveredNewError;
+      }
+    }
+    seeds.erase(seeds.begin());
+  }
+
+  assert(seeds.empty() ||
+         seeds.begin()->maxInstructions != state->steppedInstructions);
+
+  if (!seeds.empty()) {
     return false;
   }
 
-  std::vector<ExecutingSeed>::iterator siit = it->second.begin();
-  if (siit->maxInstructions &&
-      siit->maxInstructions <= state->steppedInstructions) {
-    assert(siit->maxInstructions == state->steppedInstructions &&
-           "state stepped instructions exceeded seed max instructions");
-    state->coveredNew = siit->coveredNew;
-    if (siit->coveredNewError) {
-      state->coveredNewError = siit->coveredNewError;
-    }
-    seedMap->erase(state);
-    objectManager->unseed(state);
-    if (seedMap->size() == 0) {
-      klee_message("Seeding done!\n");
-    }
-    return true;
+  seedMap->erase(state);
+  objectManager->unseed(state);
+  if (seedMap->size() == 0) {
+    klee_message("Seeding done!\n");
   }
-  return false;
+  return true;
 }
 
 void Executor::goForward(ref<ForwardAction> action) {
@@ -4784,7 +4794,6 @@ void Executor::goForward(ref<ForwardAction> action) {
   if (targetManager) {
     targetManager->pullGlobal(state);
   }
-
   if (targetCalculator && TrackCoverage != TrackCoverageBy::None &&
       state.multiplexKF && functionsByModule.modules.size() > 1 &&
       targetCalculator->isCovered(state.multiplexKF)) {
@@ -4800,7 +4809,8 @@ void Executor::goForward(ref<ForwardAction> action) {
   } else if (state.isSymbolicCycled(MaxSymbolicCycles)) {
     terminateStateEarly(state, "max-sym-cycles exceeded.",
                         StateTerminationType::MaxCycles);
-  } else if (!fa->state->isSeeded || !reachedMaxSeedInstructions(fa->state)) {
+  } else if (!state.isSeeded || !reachedMaxSeedInstructions(&state)) {
+
     KInstruction *ki = state.pc;
     stepInstruction(state);
     executeInstruction(state, ki);
@@ -6812,14 +6822,13 @@ void Executor::executeMakeSymbolic(ExecutionState &state,
 
     if (state.isSeeded) { // In seed mode we need to add this as a
                           // binding.
-      std::map<ExecutionState *, std::vector<ExecutingSeed>>::iterator it =
-          seedMap->find(&state);
+      std::map<ExecutionState *, seeds_ty>::iterator it = seedMap->find(&state);
       assert(it != seedMap->end());
       assert(!it->second.empty());
-      for (std::vector<ExecutingSeed>::iterator siit = it->second.begin(),
-                                                siie = it->second.end();
+      for (seeds_ty::iterator siit = it->second.begin(),
+                              siie = it->second.end();
            siit != siie; ++siit) {
-        ExecutingSeed &si = *siit;
+        const ExecutingSeed &si = *siit;
         KTestObject *obj = si.getNextInput(mo, NamedSeedMatching);
 
         if (!obj) {

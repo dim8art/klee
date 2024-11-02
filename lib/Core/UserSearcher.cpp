@@ -16,8 +16,6 @@
 
 #include "llvm/Support/CommandLine.h"
 
-#include <string>
-
 using namespace llvm;
 using namespace klee;
 
@@ -207,7 +205,8 @@ Searcher *klee::constructUserSearcher(Executor &executor) {
   } else {
     searcher = constructBaseSearcher(executor);
   }
-  if(RunForever){
+  if (RunForever || SeedOutFile.begin() != SeedOutFile.end() ||
+      SeedOutDir.begin() != SeedOutDir.end()) {
     searcher = new SeededSearcher(searcher);
   }
   llvm::raw_ostream &os = executor.getHandler().getInfoStream();

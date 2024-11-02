@@ -27,13 +27,13 @@ class MemoryObject;
 
 class ExecutingSeed {
 public:
-  Assignment assignment;
+  mutable Assignment assignment;
   std::shared_ptr<KTest> input;
   unsigned maxInstructions = 0;
-  std::set<struct KTestObject *> used;
+  mutable std::set<struct KTestObject *> used;
   mutable std::deque<ref<box<bool>>> coveredNew;
   mutable ref<box<bool>> coveredNewError = nullptr;
-  unsigned inputPosition = 0;
+  mutable unsigned inputPosition = 0;
 
 public:
   ~ExecutingSeed() {}
@@ -52,7 +52,7 @@ public:
       : assignment(assignment), maxInstructions(maxInstructions),
         coveredNew(coveredNew), coveredNewError(coveredNewError) {}
 
-  KTestObject *getNextInput(const MemoryObject *mo, bool byName);
+  KTestObject *getNextInput(const MemoryObject *mo, bool byName) const;
 
   static void kTestDeleter(KTest *ktest);
 };
