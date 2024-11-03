@@ -8,19 +8,19 @@
 //===----------------------------------------------------------------------===//
 #include "Passes.h"
 
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Value.h"
-#include "llvm/Support/Casting.h"
-#include <cassert>
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/IR/Attributes.h"
-#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/IR/IRBuilder.h"
+#include <cassert>
 
 #include <string>
 #include <unordered_map>

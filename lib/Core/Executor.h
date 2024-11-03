@@ -786,8 +786,7 @@ public:
 
   void useSeeds(std::vector<SeedFromFile> seeds) override {
     for (SeedFromFile seed : seeds) {
-      usingInitialSeeds.push_back(
-          ExecutingSeed(seed.maxInstructions));
+      usingInitialSeeds.push_back(ExecutingSeed(seed.maxInstructions));
     }
   }
 

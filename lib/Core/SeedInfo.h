@@ -42,8 +42,8 @@ public:
   explicit ExecutingSeed(unsigned maxInstructions,
                          std::deque<ref<box<bool>>> coveredNew = {},
                          ref<box<bool>> coveredNewError = 0)
-      : maxInstructions(maxInstructions),
-        coveredNew(coveredNew), coveredNewError(coveredNewError) {}
+      : maxInstructions(maxInstructions), coveredNew(coveredNew),
+        coveredNewError(coveredNewError) {}
 
   explicit ExecutingSeed(Assignment assignment, unsigned maxInstructions,
                          std::deque<ref<box<bool>>> coveredNew,

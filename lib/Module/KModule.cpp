@@ -7,9 +7,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <klee/System/Time.h>
 #include "llvm/IR/Attributes.h"
 #include "llvm/Transforms/IPO.h"
+#include <klee/System/Time.h>
 #define DEBUG_TYPE "KModule"
 
 #include "Passes.h"

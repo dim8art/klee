@@ -657,8 +657,8 @@ private:
   ty maxCycles;
 
 public:
-  explicit MaxCyclesMetric(ty maxCycles) : maxCycles(maxCycles) {};
-  explicit MaxCyclesMetric() : MaxCyclesMetric(1ULL) {};
+  explicit MaxCyclesMetric(ty maxCycles) : maxCycles(maxCycles){};
+  explicit MaxCyclesMetric() : MaxCyclesMetric(1ULL){};
 
   bool exceeds(const ExecutionState &state) const final {
     return state.isCycled(maxCycles);

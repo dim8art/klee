@@ -1195,9 +1195,8 @@ bool Executor::branchingPermitted(ExecutionState &state, unsigned N) {
   if (state.isSeeded) {
     return true;
   }
-  if ((MaxMemoryInhibit && atMemoryLimit) ||
-      state.forkDisabled || inhibitForking ||
-      (MaxForks != ~0u && stats::forks >= MaxForks)) {
+  if ((MaxMemoryInhibit && atMemoryLimit) || state.forkDisabled ||
+      inhibitForking || (MaxForks != ~0u && stats::forks >= MaxForks)) {
 
     if (MaxMemoryInhibit && atMemoryLimit)
       klee_warning_once(0, "skipping fork (memory cap exceeded)");
@@ -4402,8 +4401,9 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
     return None;
   }
   const auto lastWeightOfState =
-      std::max(0.01, (double) lastTotalMemoryUsage) / numStates;
-  const auto lastMaxNumStates = std::max(1UL, (unsigned long) (MaxMemory / lastWeightOfState));
+      std::max(0.01, (double)lastTotalMemoryUsage) / numStates;
+  const auto lastMaxNumStates =
+      std::max(1UL, (unsigned long)(MaxMemory / lastWeightOfState));
 
   // We need to avoid calling GetTotalMallocUsage() often because it
   // is O(elts on freelist). This is really bad since we start
@@ -4416,8 +4416,9 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
 
   const auto totalUsage = getMemoryUsage() >> 20U;
   lastTotalMemoryUsage = totalUsage;
-  const auto weightOfState = std::max(0.01, (double) totalUsage / numStates);
-  const auto maxNumStates = std::max(1UL, (unsigned long) (MaxMemory / weightOfState));
+  const auto weightOfState = std::max(0.01, (double)totalUsage / numStates);
+  const auto maxNumStates =
+      std::max(1UL, (unsigned long)(MaxMemory / weightOfState));
 
   if (MemoryTriggerCoverOnTheFly && totalUsage > MaxMemory * 0.75) {
     klee_warning_once(0,
@@ -4963,7 +4964,7 @@ void Executor::terminateStateEarly(ExecutionState &state, const Twine &message,
        shouldWriteTest(state)) ||
       (AlwaysOutputSeeds && seedMap->count(&state))) {
     state.clearCoveredNew();
-    if (RunForever && (reason <= StateTerminationType::EARLY) ) {
+    if (RunForever && (reason <= StateTerminationType::EARLY)) {
       ExecutingSeed seed;
       bool success = storeState(state, seed);
       if (success) {

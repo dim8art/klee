@@ -1576,20 +1576,20 @@ static int run_klee_on_function(int pArgc, char **pArgv, char **pEnvp,
       }
       seeds.push_back(out);
     }
-      if (kTestFiles.empty()) {
-        klee_error("seeds directory is empty: %s\n", (*it).c_str());
-      }
+    if (kTestFiles.empty()) {
+      klee_error("seeds directory is empty: %s\n", (*it).c_str());
     }
+  }
 
-    if (!seeds.empty()) {
-      klee_message("KLEE: using %lu seeds\n", seeds.size());
-      interpreter->useSeeds(seeds);
-    }
-    if (RunInDir != "") {
-      int res = chdir(RunInDir.c_str());
-      if (res < 0) {
-        klee_error("Unable to change directory to: %s - %s", RunInDir.c_str(),
-                   sys::StrError(errno).c_str());
+  if (!seeds.empty()) {
+    klee_message("KLEE: using %lu seeds\n", seeds.size());
+    interpreter->useSeeds(seeds);
+  }
+  if (RunInDir != "") {
+    int res = chdir(RunInDir.c_str());
+    if (res < 0) {
+      klee_error("Unable to change directory to: %s - %s", RunInDir.c_str(),
+                 sys::StrError(errno).c_str());
     }
   }
 
