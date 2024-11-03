@@ -4401,7 +4401,7 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
     return None;
   }
   const auto lastWeightOfState =
-      std::max(0.01, (double)lastTotalMemoryUsage) / numStates;
+      std::max(0.001, (double)lastTotalMemoryUsage) / numStates;
   const auto lastMaxNumStates =
       std::max(1UL, (unsigned long)(MaxMemory / lastWeightOfState));
 
@@ -4416,7 +4416,7 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
 
   const auto totalUsage = getMemoryUsage() >> 20U;
   lastTotalMemoryUsage = totalUsage;
-  const auto weightOfState = std::max(0.01, (double)totalUsage / numStates);
+  const auto weightOfState = std::max(0.001, (double)totalUsage / numStates);
   const auto maxNumStates =
       std::max(1UL, (unsigned long)(MaxMemory / weightOfState));
 
@@ -4958,24 +4958,11 @@ void Executor::terminateStateEarly(ExecutionState &state, const Twine &message,
     assert(reason > StateTerminationType::EXIT);
     ++stats::terminationEarly;
   }
-  if ((RunForever && (reason <= StateTerminationType::EARLY)) ||
-      ((reason <= StateTerminationType::EARLY ||
-        reason == StateTerminationType::MissedAllTargets) &&
-       shouldWriteTest(state)) ||
-      (AlwaysOutputSeeds && seedMap->count(&state))) {
-    state.clearCoveredNew();
-    if (RunForever && (reason <= StateTerminationType::EARLY)) {
-      ExecutingSeed seed;
-      bool success = storeState(state, seed);
-      if (success) {
-        storedSeeds->push_back(seed);
-      }
-    } else {
-      interpreterHandler->processTestCase(
-          state, (message + "\n").str().c_str(),
-          terminationTypeFileExtension(reason).c_str(),
-          reason > StateTerminationType::EARLY &&
-              reason <= StateTerminationType::EXECERR);
+  if (RunForever && (reason <= StateTerminationType::EARLY)) {
+    ExecutingSeed seed;
+    bool success = storeState(state, seed);
+    if (success) {
+      storedSeeds->push_back(seed);
     }
   } else if (((reason <= StateTerminationType::EARLY ||
                reason == StateTerminationType::MissedAllTargets) &&
