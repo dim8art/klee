@@ -4402,8 +4402,8 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
     return None;
   }
   const auto lastWeightOfState =
-      std::max(1UL, lastTotalMemoryUsage / numStates);
-  const auto lastMaxNumStates = std::max(1UL, MaxMemory / lastWeightOfState);
+      std::max(0.01, (double) lastTotalMemoryUsage) / numStates;
+  const auto lastMaxNumStates = std::max(1UL, (unsigned long) (MaxMemory / lastWeightOfState));
 
   // We need to avoid calling GetTotalMallocUsage() often because it
   // is O(elts on freelist). This is really bad since we start
@@ -4416,8 +4416,8 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
 
   const auto totalUsage = getMemoryUsage() >> 20U;
   lastTotalMemoryUsage = totalUsage;
-  const auto weightOfState = std::max(1UL, totalUsage / numStates);
-  const auto maxNumStates = std::max(1UL, MaxMemory / weightOfState);
+  const auto weightOfState = std::max(0.01, (double) totalUsage / numStates);
+  const auto maxNumStates = std::max(1UL, (unsigned long) (MaxMemory / weightOfState));
 
   if (MemoryTriggerCoverOnTheFly && totalUsage > MaxMemory * 0.75) {
     klee_warning_once(0,
