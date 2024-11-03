@@ -202,7 +202,7 @@ class KLEEF(object):
         write_ktests=False,
         property_file=None,
         run_forever=True,
-        debug=True,
+        debug=False,
     ):
         self.source = Path(source) if source else None
         self.is32 = is32
