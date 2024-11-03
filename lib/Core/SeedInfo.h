@@ -28,7 +28,6 @@ class MemoryObject;
 class ExecutingSeed {
 public:
   mutable Assignment assignment;
-  std::shared_ptr<KTest> input;
   unsigned maxInstructions = 0;
   mutable std::set<struct KTestObject *> used;
   mutable std::deque<ref<box<bool>>> coveredNew;
@@ -40,10 +39,10 @@ public:
 
   ExecutingSeed() {}
 
-  explicit ExecutingSeed(KTest *input, unsigned maxInstructions,
+  explicit ExecutingSeed(unsigned maxInstructions,
                          std::deque<ref<box<bool>>> coveredNew = {},
                          ref<box<bool>> coveredNewError = 0)
-      : input(input, kTestDeleter), maxInstructions(maxInstructions),
+      : maxInstructions(maxInstructions),
         coveredNew(coveredNew), coveredNewError(coveredNewError) {}
 
   explicit ExecutingSeed(Assignment assignment, unsigned maxInstructions,
@@ -51,8 +50,6 @@ public:
                          ref<box<bool>> coveredNewError)
       : assignment(assignment), maxInstructions(maxInstructions),
         coveredNew(coveredNew), coveredNewError(coveredNewError) {}
-
-  KTestObject *getNextInput(const MemoryObject *mo, bool byName) const;
 
   static void kTestDeleter(KTest *ktest);
 };

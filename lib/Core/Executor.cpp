@@ -6819,62 +6819,6 @@ void Executor::executeMakeSymbolic(ExecutionState &state,
       }
     }
     state.addSymbolic(mo, array, type);
-
-    if (state.isSeeded) { // In seed mode we need to add this as a
-                          // binding.
-      std::map<ExecutionState *, seeds_ty>::iterator it = seedMap->find(&state);
-      assert(it != seedMap->end());
-      assert(!it->second.empty());
-      for (seeds_ty::iterator siit = it->second.begin(),
-                              siie = it->second.end();
-           siit != siie; ++siit) {
-        const ExecutingSeed &si = *siit;
-        KTestObject *obj = si.getNextInput(mo, NamedSeedMatching);
-
-        if (!obj) {
-          if (si.assignment.bindings.count(array) != 0) {
-            continue;
-          }
-          if (ZeroSeedExtension) {
-            si.assignment.bindings.replace(
-                {array, SparseStorageImpl<unsigned char>(0)});
-          } else if (!AllowSeedExtension) {
-            terminateStateOnUserError(state,
-                                      "ran out of inputs during seeding");
-            // objectManager->unseed(&state);
-            break;
-          }
-        } else {
-          ref<ConstantExpr> sizeExpr =
-              dyn_cast<ConstantExpr>(mo->getSizeExpr());
-          if (sizeExpr) {
-            unsigned moSize = sizeExpr->getZExtValue();
-            if (obj->numBytes != moSize &&
-                ((!(AllowSeedExtension || ZeroSeedExtension) &&
-                  obj->numBytes < moSize) ||
-                 (!AllowSeedTruncation && obj->numBytes > moSize))) {
-              std::stringstream msg;
-              msg << "replace size mismatch: " << mo->name << "[" << moSize
-                  << "]"
-                  << " vs " << obj->name << "[" << obj->numBytes << "]"
-                  << " in test\n";
-
-              terminateStateOnUserError(state, msg.str());
-              break;
-            } else {
-              SparseStorageImpl<unsigned char> values;
-              if (si.assignment.bindings.find(array) !=
-                  si.assignment.bindings.end()) {
-                values = si.assignment.bindings.at(array);
-              }
-              values.store(0, obj->bytes,
-                           obj->bytes + std::min(obj->numBytes, moSize));
-              si.assignment.bindings.replace({array, values});
-            }
-          }
-        }
-      }
-    }
   } else {
     ObjectState *os = bindObjectInState(state, mo, type, false);
     if (replayPosition >= replayKTest->numObjects) {
