@@ -1429,17 +1429,9 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
       }
     }
     if (!trueSeeds.empty() && falseSeeds.empty()) {
-      if (!shouldCheckFalseBlock) {
-        res = PartialValidity::MustBeTrue;
-      } else {
         res = PartialValidity::MayBeTrue;
-      }
     } else if (trueSeeds.empty() && !falseSeeds.empty()) {
-      if (!shouldCheckTrueBlock) {
-        res = PartialValidity::MustBeFalse;
-      } else {
         res = PartialValidity::MayBeFalse;
-      }
     } else if (!trueSeeds.empty() && !falseSeeds.empty()) {
       res = PValidity::TrueOrFalse;
     }
