@@ -4958,7 +4958,7 @@ void Executor::terminateStateEarly(ExecutionState &state, const Twine &message,
     assert(reason > StateTerminationType::EXIT);
     ++stats::terminationEarly;
   }
-  if (RunForever && (reason <= StateTerminationType::EARLY)) {
+  if (RunForever && reason == StateTerminationType::OutOfMemory) {
     ExecutingSeed seed;
     bool success = storeState(state, seed);
     if (success) {
