@@ -446,6 +446,7 @@ def run(args):
         write_ktests=args.write_ktests,
         run_forever=args.run_forever,
         property_file=args.property_file,
+        debug=args.debug,
     )
     wrapper.compile()
     return wrapper.run()
