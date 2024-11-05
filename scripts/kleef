@@ -99,7 +99,7 @@ def klee_options(
             "--exit-on-error-type=Assert",  # Only generate test cases of type assert
             # "--dump-test-case-type=Assert", # Only dump test cases of type assert
             "--search=dfs",
-            "--search=bfs",
+            "--search=random-state",
             #    "--search=nurs:covnew", "--search=random-path","--search=dfs", "--use-batching-search",
             #    "--search=distance","--search=random-path","--use-batching-search",
             # "--target-assert", # Target
