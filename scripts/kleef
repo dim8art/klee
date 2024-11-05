@@ -41,7 +41,7 @@ def klee_options(
         # "--solver-backend=bitwuzla-tree",
         "--solver-backend=bitwuzla",
         "--max-solvers-approx-tree-inc=16",
-        f"--max-memory={int(max_memory * 0.9)}",  # Just use half of the memory in case we have to fork
+        f"--max-memory={int(max_memory * 0.7)}",  # Just use half of the memory in case we have to fork
         "--libc=klee",
         "--skip-not-lazy-initialized",
         f"--output-dir={test_output_dir}",  # Output files into specific directory
