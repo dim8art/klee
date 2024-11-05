@@ -343,6 +343,7 @@ void KModule::optimiseAndPrepare(
   if (SplitReturns) {
     pm3.add(new ReturnSplitter());
   }
+  pm3.add(new FreezeLower());
   pm3.run(*module);
 
   {
