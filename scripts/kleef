@@ -68,12 +68,14 @@ def klee_options(
         #  "-const-array-opt",
         "--use-batching-search",
         "--use-concretizing-solver=false",
+        "--batch-instructions=10000",
         "--batch-time=0",
         "--only-output-make-symbolic-arrays",
         "--memory-backend=mixed",
         "--max-fixed-size-structures-size=64",
         "--optimize=true",
         "--rewrite-equalities=none",
+        "--use-iterative-deepening-search=max-cycles",
     ]
     if run_forever:
         cmd += [
@@ -90,7 +92,6 @@ def klee_options(
 
     if f_err:
         cmd += [
-            "--batch-instructions=1000000",
             "--use-alpha-equivalence=true",
             "--function-call-reproduce=reach_error",
             # "--max-cycles=0",
@@ -116,13 +117,11 @@ def klee_options(
 
     if f_cov:
         cmd += [
-            "--batch-instructions=10000",
             "--use-guided-search=coverage",
             "--mem-trigger-cof=false", # Start on the fly tests generation after approaching memory cup
             "--use-alpha-equivalence=true",
             # "--optimize-aggressive=false",
             "--track-coverage=branches", # Only branches and only instructions are wrong in real life. E.g., ternary operators are sometimes counted as different branches, while we stick to look at them as a single instruction from a single branch
-            "--use-iterative-deepening-search=max-cycles",
             f"--max-solver-time={MAX_SOLVER_TIME}s",
             "--max-cycles-before-stuck=15",
             # "--tc-type=cov",
