@@ -1248,42 +1248,6 @@ void Executor::branch(ExecutionState &state,
     }
   }
 
-  if (state.isSeeded) {
-    std::map<ExecutionState *, seeds_ty>::iterator it = seedMap->find(&state);
-    assert(it != seedMap->end());
-    assert(!it->second.empty());
-    seeds_ty seeds = it->second;
-    seedMap->erase(it);
-    objectManager->unseed(it->first);
-    // Assume each seed only satisfies one condition (necessarily true
-    // when conditions are mutually exclusive and their conjunction is
-    // a tautology).
-    for (seeds_ty::iterator siit = seeds.begin(), siie = seeds.end();
-         siit != siie; ++siit) {
-      unsigned i;
-      for (i = 0; i < N; ++i) {
-        ref<ConstantExpr> res;
-        bool success = solver->getValue(
-            state.constraints.cs(), siit->assignment.evaluate(conditions[i]),
-            res, state.queryMetaData);
-        assert(success && "FIXME: Unhandled solver failure");
-        (void)success;
-        if (res->isTrue())
-          break;
-      }
-
-      // If we didn't find a satisfying condition randomly pick one
-      // (the seed will be patched).
-      if (i == N)
-        i = theRNG.getInt32() % N;
-
-      // Extra check in case we're replaying seeds with a max-fork
-      if (result[i]) {
-        seedMap->at(result[i]).insert(*siit);
-      }
-    }
-  }
-
   for (unsigned i = 0; i < N; ++i)
     if (result[i]) {
       result[i]->afterFork = true;
