@@ -15,6 +15,8 @@
 
 #include "llvm/Support/raw_ostream.h"
 
+#include <klee/Module/LocationInfo.h>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -71,6 +73,7 @@ struct KInstruction : public KValue {
   /// register indices.
   int *operands;
   KBlock *parent;
+  mutable std::optional<LocationInfo> locationInfo;
 
 private:
   // Instruction index in the basic block

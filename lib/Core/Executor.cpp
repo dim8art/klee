@@ -1429,9 +1429,9 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
       }
     }
     if (!trueSeeds.empty() && falseSeeds.empty()) {
-        res = PartialValidity::MayBeTrue;
+      res = PartialValidity::MayBeTrue;
     } else if (trueSeeds.empty() && !falseSeeds.empty()) {
-        res = PartialValidity::MayBeFalse;
+      res = PartialValidity::MayBeFalse;
     } else if (!trueSeeds.empty() && !falseSeeds.empty()) {
       res = PValidity::TrueOrFalse;
     }
@@ -4387,7 +4387,7 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
   if (!MaxMemory)
     return None;
 
-  auto states = objectManager->getStates();
+  const auto &states = objectManager->getStates();
   const auto numStates = states.size();
   if (numStates < 5) {
     return None;
@@ -4423,7 +4423,8 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
   // only terminate states when threshold (+1%) exceeded
   if (totalUsage < MaxMemory * 0.6 && numStates < maxNumStates * 0.6) {
     return Executor::Low;
-  } else if (totalUsage <= MaxMemory * 1.01 && 2 * numStates <= maxNumStates) {
+  } else if (totalUsage <= MaxMemory * 1.01 &&
+             numStates <= maxNumStates * 1.01) {
     return Executor::High;
   }
 
@@ -4434,9 +4435,13 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
       arr.push_back(state);
     }
   }
-  auto toKill = std::max(1UL, numStates - numStates * MaxMemory / totalUsage);
-  toKill = std::max(toKill, numStates * numStates / maxNumStates);
+  // auto toKill = std::max(1UL, numStates - numStates * MaxMemory /
+  // totalUsage);
+  auto toKill = std::max(1UL, numStates - (unsigned long)(maxNumStates * 0.6));
   toKill = std::min(toKill, numStates - 1);
+  if (toKill < 30) {
+    toKill = 0;
+  }
 
   if (toKill != 0) {
     klee_warning("killing %lu states (total memory usage: %luMB)", toKill,
@@ -4515,7 +4520,7 @@ const KFunction *Executor::getKFunction(const llvm::Function *f) const {
 
 std::vector<ExecutingSeed> Executor::uploadNewSeeds() {
   // just guess at how many to kill
-  auto states = objectManager->getStates();
+  auto &states = objectManager->getStates();
   const auto numStates = std::max(1UL, states.size());
   const auto weightOfState = std::max(1UL, lastTotalMemoryUsage / numStates);
   std::vector<ExecutingSeed> seeds;
@@ -4548,9 +4553,11 @@ void Executor::initialSeed(ExecutionState &initialState,
 
 bool Executor::storeState(const ExecutionState &state, ExecutingSeed &res) {
   ref<SolverResponse> response;
+  solver->setTimeout(coreSolverTimeout);
   bool success =
       solver->getResponse(state.constraints.cs(), Expr::createFalse(), response,
                           state.queryMetaData);
+  solver->setTimeout(time::Span());
   if (!success) {
     klee_warning("unable to get symbolic solution, losing test case");
     return false;

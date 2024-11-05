@@ -178,11 +178,6 @@ Searcher *klee::constructBaseSearcher(Executor &executor) {
     searcher = new InterleavedSearcher(s);
   }
 
-  if (UseBatchingSearch) {
-    searcher = new BatchingSearcher(searcher, time::Span(BatchTime),
-                                    BatchInstructions);
-  }
-
   if (executor.guidanceKind != Interpreter::GuidanceKind::NoGuidance) {
     searcher = new GuidedSearcher(searcher, *executor.distanceCalculator,
                                   *executor.targetManager, executor.theRNG);
@@ -191,6 +186,18 @@ Searcher *klee::constructBaseSearcher(Executor &executor) {
   if (UseIterativeDeepeningSearch != HaltExecution::Reason::Unspecified) {
     searcher =
         new IterativeDeepeningSearcher(searcher, UseIterativeDeepeningSearch);
+  }
+
+  if (UseBatchingSearch) {
+    searcher = new BatchingSearcher(searcher, time::Span(BatchTime),
+                                    BatchInstructions);
+  }
+
+  if (RunForever || SeedOutFile.begin() != SeedOutFile.end() ||
+      SeedOutDir.begin() != SeedOutDir.end()) {
+    searcher = new SeededSearcher(searcher,
+                                  getNewSearcher(CoreSearch[0], executor.theRNG,
+                                                 *executor.processForest));
   }
 
   return searcher;
@@ -204,10 +211,6 @@ Searcher *klee::constructUserSearcher(Executor &executor) {
                                             executor.theRNG, 1);
   } else {
     searcher = constructBaseSearcher(executor);
-  }
-  if (RunForever || SeedOutFile.begin() != SeedOutFile.end() ||
-      SeedOutDir.begin() != SeedOutDir.end()) {
-    searcher = new SeededSearcher(searcher);
   }
   llvm::raw_ostream &os = executor.getHandler().getInfoStream();
 
