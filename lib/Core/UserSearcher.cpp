@@ -178,6 +178,11 @@ Searcher *klee::constructBaseSearcher(Executor &executor) {
     searcher = new InterleavedSearcher(s);
   }
 
+  if (UseBatchingSearch) {
+    searcher = new BatchingSearcher(searcher, time::Span(BatchTime),
+                                    BatchInstructions);
+  }
+
   if (executor.guidanceKind != Interpreter::GuidanceKind::NoGuidance) {
     searcher = new GuidedSearcher(searcher, *executor.distanceCalculator,
                                   *executor.targetManager, executor.theRNG);
@@ -186,11 +191,6 @@ Searcher *klee::constructBaseSearcher(Executor &executor) {
   if (UseIterativeDeepeningSearch != HaltExecution::Reason::Unspecified) {
     searcher =
         new IterativeDeepeningSearcher(searcher, UseIterativeDeepeningSearch);
-  }
-
-  if (UseBatchingSearch) {
-    searcher = new BatchingSearcher(searcher, time::Span(BatchTime),
-                                    BatchInstructions);
   }
 
   if (RunForever || SeedOutFile.begin() != SeedOutFile.end() ||
