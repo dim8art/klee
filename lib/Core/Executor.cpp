@@ -4711,20 +4711,18 @@ bool Executor::reachedMaxSeedInstructions(ExecutionState *state) {
 
   seeds_ty &seeds = it->second;
 
-  assert(!seeds.empty());
-  assert(seeds.begin()->maxInstructions >= state->steppedInstructions &&
+  assert(seeds.size() == 1);
+  seeds_ty::iterator siit = seeds.begin();
+  assert(siit->maxInstructions >= state->steppedInstructions &&
          "state stepped instructions exceeded seed max instructions");
 
-  seeds_ty::iterator siit = seeds.begin();
   if (siit->maxInstructions &&
       siit->maxInstructions == state->steppedInstructions) {
-    if (seeds.size() == 1) {
-      state->coveredNew = siit->coveredNew;
-      if (siit->coveredNewError) {
-        state->coveredNewError = siit->coveredNewError;
-      }
+    state->coveredNew = siit->coveredNew;
+    if (siit->coveredNewError) {
+      state->coveredNewError = siit->coveredNewError;
     }
-    seeds.erase(seeds.begin());
+    seeds.clear();
   }
 
   assert(seeds.empty() ||
