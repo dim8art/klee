@@ -4387,8 +4387,7 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
   // only terminate states when threshold (+1%) exceeded
   if (totalUsage < MaxMemory * 0.6 && numStates < maxNumStates * 0.6) {
     return Executor::Low;
-  } else if (totalUsage <= MaxMemory * 1.01 &&
-             numStates <= maxNumStates * 1.01) {
+  } else if (totalUsage <= MaxMemory * 1.01 && 2 * numStates <= maxNumStates) {
     return Executor::High;
   }
 
@@ -4401,11 +4400,11 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
   }
   // auto toKill = std::max(1UL, numStates - numStates * MaxMemory /
   // totalUsage);
-  auto toKill = std::max(1UL, numStates - (unsigned long)(maxNumStates * 0.6));
+  // auto toKill = std::max(1UL, numStates - (unsigned long)(maxNumStates *
+  // 0.6));
+  auto toKill = std::max(1UL, numStates - numStates * MaxMemory / totalUsage);
+  toKill = std::max(toKill, numStates * numStates / maxNumStates);
   toKill = std::min(toKill, numStates - 1);
-  if (toKill < 30) {
-    toKill = 0;
-  }
 
   if (toKill != 0) {
     klee_warning("killing %lu states (total memory usage: %luMB)", toKill,
