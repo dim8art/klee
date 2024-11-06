@@ -4353,7 +4353,7 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
 
   const auto &states = objectManager->getStates();
   const auto numStates = states.size();
-  if (numStates < 5) {
+  if (numStates < 100) {
     return None;
   }
   const auto lastWeightOfState =
@@ -4365,7 +4365,8 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
   // is O(elts on freelist). This is really bad since we start
   // to pummel the freelist once we hit the memory cap.
   // every 65536 instructions
-  if ((stats::instructions & 0xFFFFU) != 0 && 2 * numStates < lastMaxNumStates)
+  if ((stats::instructions & 0xFFFFU) != 0 &&
+      numStates < lastMaxNumStates * 0.4)
     return None;
 
   // check memory limit
@@ -4385,9 +4386,10 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
 
   // just guess at how many to kill
   // only terminate states when threshold (+1%) exceeded
-  if (totalUsage < MaxMemory * 0.6 && numStates < maxNumStates * 0.6) {
+  if (totalUsage < MaxMemory * 0.6 && numStates < maxNumStates * 0.4) {
     return Executor::Low;
-  } else if (totalUsage <= MaxMemory * 1.01 && 2 * numStates <= maxNumStates) {
+  } else if (totalUsage <= MaxMemory * 1.01 &&
+             numStates <= maxNumStates * 0.7) {
     return Executor::High;
   }
 
@@ -4398,13 +4400,8 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
       arr.push_back(state);
     }
   }
-  // auto toKill = std::max(1UL, numStates - numStates * MaxMemory /
-  // totalUsage);
-  // auto toKill = std::max(1UL, numStates - (unsigned long)(maxNumStates *
-  // 0.6));
-  auto toKill = std::max(1UL, numStates - numStates * MaxMemory / totalUsage);
-  toKill = std::max(toKill, numStates * numStates / maxNumStates);
-  toKill = std::min(toKill, numStates - 1);
+  auto toKill =
+      std::min(numStates - 1, numStates - (unsigned long)(maxNumStates * 0.4));
 
   if (toKill != 0) {
     klee_warning("killing %lu states (total memory usage: %luMB)", toKill,
@@ -4421,6 +4418,10 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
     std::swap(arr[idx], arr[N - 1]);
     terminateStateEarly(*arr[N - 1], "Memory limit exceeded.",
                         StateTerminationType::OutOfMemory);
+  }
+
+  if (toKill != 0) {
+    klee_warning("stop killing");
   }
 
   return Executor::Full;
@@ -4486,10 +4487,13 @@ std::vector<ExecutingSeed> Executor::uploadNewSeeds() {
   auto &states = objectManager->getStates();
   const auto numStates = std::max(1UL, states.size());
   const auto weightOfState = std::max(1UL, lastTotalMemoryUsage / numStates);
+  const auto maxNumStates =
+      std::max(1UL, (unsigned long)(MaxMemory / weightOfState));
   std::vector<ExecutingSeed> seeds;
   unsigned long numStoredSeeds = storedSeeds->size();
-  unsigned toUpload =
-      std::min(numStoredSeeds, MaxMemory / weightOfState - numStates);
+  unsigned long toUpload =
+      numStates < maxNumStates * 0.4 ? maxNumStates * 0.4 - numStates : 0;
+  toUpload = std::min(toUpload, numStoredSeeds);
 
   while ((!toUpload || seeds.size() <= toUpload) && !storedSeeds->empty()) {
     seeds.push_back(storedSeeds->front());
@@ -4703,7 +4707,7 @@ void Executor::executeAction(ref<SearcherAction> action) {
   timers.invoke();
 }
 
-bool Executor::reachedMaxSeedInstructions(ExecutionState *state) {
+void Executor::unseedIfReachedMacSeedInstructions(ExecutionState *state) {
   assert(state->isSeeded);
   auto it = seedMap->find(state);
   assert(it != seedMap->end());
@@ -4728,7 +4732,7 @@ bool Executor::reachedMaxSeedInstructions(ExecutionState *state) {
          seeds.begin()->maxInstructions != state->steppedInstructions);
 
   if (!seeds.empty()) {
-    return false;
+    return;
   }
 
   seedMap->erase(state);
@@ -4736,7 +4740,6 @@ bool Executor::reachedMaxSeedInstructions(ExecutionState *state) {
   if (seedMap->size() == 0) {
     klee_message("Seeding done!\n");
   }
-  return true;
 }
 
 void Executor::goForward(ref<ForwardAction> action) {
@@ -4755,6 +4758,9 @@ void Executor::goForward(ref<ForwardAction> action) {
   if (targetManager) {
     targetManager->pullGlobal(state);
   }
+  if (state.isSeeded) {
+    unseedIfReachedMacSeedInstructions(&state);
+  }
   if (targetCalculator && TrackCoverage != TrackCoverageBy::None &&
       state.multiplexKF && functionsByModule.modules.size() > 1 &&
       targetCalculator->isCovered(state.multiplexKF)) {
@@ -4770,7 +4776,7 @@ void Executor::goForward(ref<ForwardAction> action) {
   } else if (state.isSymbolicCycled(MaxSymbolicCycles)) {
     terminateStateEarly(state, "max-sym-cycles exceeded.",
                         StateTerminationType::MaxCycles);
-  } else if (!state.isSeeded || !reachedMaxSeedInstructions(&state)) {
+  } else {
 
     KInstruction *ki = state.pc;
     stepInstruction(state);

@@ -740,7 +740,7 @@ private:
 
   void executeAction(ref<SearcherAction> action);
 
-  bool reachedMaxSeedInstructions(ExecutionState *state);
+  void unseedIfReachedMacSeedInstructions(ExecutionState *state);
   void goForward(ref<ForwardAction> action);
 
   const KInstruction *getKInst(const llvm::Instruction *ints) const;
