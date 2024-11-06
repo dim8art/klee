@@ -135,7 +135,7 @@ def klee_options(
                 late_time = int(max_time * 0.9)
                 last_time = int(max_time * 0.97)
             else:
-                late_time = int(max_time * 0.8)
+                late_time = int(max_time * 0.7)
                 last_time = int(max_time * 0.9)
             cmd += [
                 "--cover-on-the-fly=true",
