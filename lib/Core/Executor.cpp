@@ -4910,25 +4910,21 @@ void Executor::terminateStateEarly(ExecutionState &state, const Twine &message,
     assert(reason > StateTerminationType::EXIT);
     ++stats::terminationEarly;
   }
-  if ((RunForever && (reason <= StateTerminationType::EARLY)) ||
-      ((reason <= StateTerminationType::EARLY ||
-        reason == StateTerminationType::MissedAllTargets) &&
-       shouldWriteTest(state)) ||
-      (AlwaysOutputSeeds && seedMap->count(&state))) {
-    if (RunForever && (reason <= StateTerminationType::EARLY) ) {
-      ExecutingSeed seed;
-      storeState(state, seed);
-      storedSeeds->push_back(seed);
-    } else {
-      state.clearCoveredNew();
-      interpreterHandler->processTestCase(
-          state, (message + "\n").str().c_str(),
-          terminationTypeFileExtension(reason).c_str(),
-          reason > StateTerminationType::EARLY &&
-              reason <= StateTerminationType::EXECERR);
-    }
+  if (RunForever && reason <= StateTerminationType::EARLY) {
+    ExecutingSeed seed;
+    storeState(state, seed);
+    storedSeeds->push_back(seed);
+  } else if (((reason <= StateTerminationType::EARLY ||
+               reason == StateTerminationType::MissedAllTargets) &&
+              shouldWriteTest(state)) ||
+             (AlwaysOutputSeeds && seedMap->count(&state))) {
+    state.clearCoveredNew();
+    interpreterHandler->processTestCase(
+        state, (message + "\n").str().c_str(),
+        terminationTypeFileExtension(reason).c_str(),
+        reason > StateTerminationType::EARLY &&
+            reason <= StateTerminationType::EXECERR);
   }
-
   terminateState(state, reason);
 }
 

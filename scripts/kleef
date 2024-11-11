@@ -68,8 +68,8 @@ def klee_options(
     ]
     if run_forever:
         cmd += [
-            "--run-forever"
-            "--upload-percentage=50"
+            "--run-forever",
+            "--upload-percentage=50",
         ]
     if is32:
         cmd += [
