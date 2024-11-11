@@ -373,33 +373,6 @@ cl::opt<bool> AlwaysOutputSeeds(
         "Dump test cases even if they are driven by seeds only (default=true)"),
     cl::cat(SeedingCat));
 
-cl::opt<bool> OnlyReplaySeeds(
-    "only-replay-seeds", cl::init(false),
-    cl::desc("Discard states that do not have a seed (default=false)."),
-    cl::cat(SeedingCat));
-
-cl::opt<bool> OnlySeed("only-seed", cl::init(false),
-                       cl::desc("Stop execution after seeding is done without "
-                                "doing regular search (default=false)."),
-                       cl::cat(SeedingCat));
-
-cl::opt<bool>
-    AllowSeedExtension("allow-seed-extension", cl::init(false),
-                       cl::desc("Allow extra (unbound) values to become "
-                                "symbolic during seeding (default=false)."),
-                       cl::cat(SeedingCat));
-
-cl::opt<bool> ZeroSeedExtension(
-    "zero-seed-extension", cl::init(false),
-    cl::desc(
-        "Use zero-filled objects if matching seed not found (default=false)"),
-    cl::cat(SeedingCat));
-
-cl::opt<bool> AllowSeedTruncation(
-    "allow-seed-truncation", cl::init(false),
-    cl::desc("Allow smaller buffers than in seeds (default=false)."),
-    cl::cat(SeedingCat));
-
 cl::opt<bool> NamedSeedMatching(
     "named-seed-matching", cl::init(false),
     cl::desc("Use names to match symbolic objects to inputs (default=false)."),
@@ -526,8 +499,7 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
                                       *targetCalculator)),
       targetedExecutionManager(
           new TargetedExecutionManager(*codeGraphInfo, *targetManager)),
-      replayKTest(0), replayPath(0), atMemoryLimit(false),
-      inhibitForking(false), coverOnTheFly(false),
+      atMemoryLimit(false), inhibitForking(false), coverOnTheFly(false),
       haltExecution(HaltExecution::NotHalt), ivcEnabled(false),
       debugLogBuffer(debugBufferString), sarifReport({}) {
 
@@ -1377,18 +1349,6 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
 
   if (!isSeeding) {
     assert(seedMap->empty());
-    if (replayPath && !isInternal) {
-      assert(replayPosition < replayPath->size() &&
-             "ran out of branches in replay path mode");
-      bool branch = (*replayPath)[replayPosition++];
-      if (branch) {
-        res = PValidity::MustBeTrue;
-        addConstraint(current, condition);
-      } else {
-        res = PValidity::MustBeFalse;
-        addConstraint(current, Expr::createIsZero(condition));
-      }
-    }
   } else {
     std::map<ExecutionState *, seeds_ty>::iterator it = seedMap->find(&current);
     assert(it != seedMap->end());
@@ -1467,8 +1427,6 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
   }
 
   if (res == PValidity::TrueOrFalse) {
-    assert(!replayKTest && "in replay mode, only one branch can be true.");
-
     if (!branchingPermitted(current, 2)) {
       TimerStatIncrementer timer(stats::forkTime);
       if (theRNG.getBool()) {
@@ -4916,6 +4874,7 @@ HaltExecution::Reason fromStateTerminationType(StateTerminationType t) {
 void Executor::terminateState(ExecutionState &state,
                               StateTerminationType terminationType) {
   if (seedMap->find(&state) != seedMap->end()) {
+    klee_warning("terminating state while replaying");
     seedMap->erase(&state);
   }
   state.terminationReasonType = fromStateTerminationType(terminationType);
@@ -4923,10 +4882,6 @@ void Executor::terminateState(ExecutionState &state,
       terminationType <= StateTerminationType::EARLY) {
     SetOfStates states = {&state};
     decreaseConfidenceFromStoppedStates(states, state.terminationReasonType);
-  }
-  if (replayKTest && replayPosition != replayKTest->numObjects) {
-    klee_warning_once(replayKTest,
-                      "replay did not consume all objects in test input.");
   }
 
   interpreterHandler->incPathsExplored();
@@ -4960,12 +4915,12 @@ void Executor::terminateStateEarly(ExecutionState &state, const Twine &message,
         reason == StateTerminationType::MissedAllTargets) &&
        shouldWriteTest(state)) ||
       (AlwaysOutputSeeds && seedMap->count(&state))) {
-    state.clearCoveredNew();
     if (RunForever && (reason <= StateTerminationType::EARLY) ) {
       ExecutingSeed seed;
       storeState(state, seed);
       storedSeeds->push_back(seed);
     } else {
+      state.clearCoveredNew();
       interpreterHandler->processTestCase(
           state, (message + "\n").str().c_str(),
           terminationTypeFileExtension(reason).c_str(),
@@ -5419,7 +5374,7 @@ void Executor::callExternalFunction(ExecutionState &state, KInstruction *target,
 ref<Expr> Executor::replaceReadWithSymbolic(ExecutionState &state,
                                             ref<Expr> e) {
   unsigned n = interpreterOpts.MakeConcreteSymbolic;
-  if (!n || replayKTest || replayPath)
+  if (!n || state.isSeeded)
     return e;
 
   // right now, we don't replace symbolics (is there any reason to?)
@@ -6778,82 +6733,49 @@ void Executor::executeMakeSymbolic(ExecutionState &state,
                                    const ref<SymbolicSource> source,
                                    bool isLocal) {
   // Create a new object state for the memory object (instead of a copy).
-  if (!replayKTest) {
-    const Array *array = makeArray(mo->getSizeExpr(), source);
-    ObjectState *os = bindObjectInState(state, mo, isLocal, array);
+  const Array *array = makeArray(mo->getSizeExpr(), source);
+  ObjectState *os = bindObjectInState(state, mo, isLocal, array);
 
-    ref<ConstantExpr> sizeExpr =
-        dyn_cast<ConstantExpr>(os->getObject()->getSizeExpr());
+  ref<ConstantExpr> sizeExpr =
+      dyn_cast<ConstantExpr>(os->getObject()->getSizeExpr());
 
-    state.addSymbolic(mo, array);
+  state.addSymbolic(mo, array);
 
-    if (state.isSeeded) { // In seed mode we need to add this as a
-                          // binding.
-      std::map<ExecutionState *, seeds_ty>::iterator it = seedMap->find(&state);
-      assert(it != seedMap->end());
-      assert(!it->second.empty());
-      for (seeds_ty::iterator siit = it->second.begin(),
-                              siie = it->second.end();
-           siit != siie; ++siit) {
-        ExecutingSeed &si = *siit;
-        KTestObject *obj = si.getNextInput(mo, NamedSeedMatching);
+  if (!state.isSeeded) {
+    return;
+  }
+  std::map<ExecutionState *, seeds_ty>::iterator it = seedMap->find(&state);
+  assert(it != seedMap->end());
+  assert(!it->second.empty());
+  for (seeds_ty::iterator siit = it->second.begin(), siie = it->second.end();
+       siit != siie; ++siit) {
+    ExecutingSeed &si = *siit;
+    KTestObject *obj = si.getNextInput(mo, NamedSeedMatching);
 
-        if (!obj) {
-          if (si.assignment.bindings.count(array) != 0) {
-            continue;
-          }
-          if (ZeroSeedExtension) {
-            si.assignment.bindings.replace(
-                {array, SparseStorageImpl<unsigned char>(0)});
-          } else if (!AllowSeedExtension) {
-            assert(false && "ran out of inputs during seeding");
-            terminateStateOnUserError(state,
-                                      "ran out of inputs during seeding");
-            break;
-          }
-        } else {
-          ref<ConstantExpr> sizeExpr =
-              dyn_cast<ConstantExpr>(mo->getSizeExpr());
-          if (sizeExpr) {
-            unsigned moSize = sizeExpr->getZExtValue();
-            if (obj->numBytes != moSize &&
-                ((!(AllowSeedExtension || ZeroSeedExtension) &&
-                  obj->numBytes < moSize) ||
-                 (!AllowSeedTruncation && obj->numBytes > moSize))) {
-              std::stringstream msg;
-              msg << "replace size mismatch: " << mo->name << "[" << moSize
-                  << "]"
-                  << " vs " << obj->name << "[" << obj->numBytes << "]"
-                  << " in test\n";
-
-              terminateStateOnUserError(state, msg.str());
-              break;
-            } else {
-              SparseStorageImpl<unsigned char> values;
-              if (si.assignment.bindings.find(array) !=
-                  si.assignment.bindings.end()) {
-                values = si.assignment.bindings.at(array);
-              }
-              values.store(0, obj->bytes,
-                           obj->bytes + std::min(obj->numBytes, moSize));
-              si.assignment.bindings.replace({array, values});
-            }
-          }
-        }
-      }
+    if (!obj) {
+      continue;
     }
-  } else {
-    ObjectState *os = bindObjectInState(state, mo, false);
-    if (replayPosition >= replayKTest->numObjects) {
-      terminateStateOnUserError(state, "replay count mismatch");
-    } else {
-      KTestObject *obj = &replayKTest->objects[replayPosition++];
-      ref<ConstantExpr> sizeExpr = dyn_cast<ConstantExpr>(mo->getSizeExpr());
-      if (sizeExpr && obj->numBytes != sizeExpr->getZExtValue()) {
-        for (unsigned i = 0; i < sizeExpr->getZExtValue(); i++)
-          os->write8(i, obj->bytes[i]);
+
+    ref<ConstantExpr> sizeExpr = dyn_cast<ConstantExpr>(mo->getSizeExpr());
+    if (sizeExpr) {
+      unsigned moSize = sizeExpr->getZExtValue();
+      if (obj->numBytes != moSize) {
+        std::stringstream msg;
+        msg << "replace size mismatch: " << mo->name << "[" << moSize << "]"
+            << " vs " << obj->name << "[" << obj->numBytes << "]"
+            << " in test\n";
+        assert(false && msg);
+        terminateStateOnUserError(state, msg.str());
+        break;
       } else {
-        terminateStateOnUserError(state, "replay size mismatch");
+        SparseStorageImpl<unsigned char> values;
+        if (si.assignment.bindings.find(array) !=
+            si.assignment.bindings.end()) {
+          values = si.assignment.bindings.at(array);
+        }
+        values.store(0, obj->bytes,
+                     obj->bytes + std::min(obj->numBytes, moSize));
+        si.assignment.bindings.replace({array, values});
       }
     }
   }

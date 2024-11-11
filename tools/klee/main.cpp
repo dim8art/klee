@@ -286,21 +286,6 @@ cl::opt<bool>
 cl::OptionCategory ReplayCat("Replaying options",
                              "These options impact replaying of test cases.");
 
-cl::list<std::string>
-    ReplayKTestFile("replay-ktest-file",
-                    cl::desc("Specify a .ktest file to use for replay"),
-                    cl::value_desc(".ktest file"), cl::cat(ReplayCat));
-
-cl::list<std::string>
-    ReplayKTestDir("replay-ktest-dir",
-                   cl::desc("Specify a directory to replay .ktest files from"),
-                   cl::value_desc("output directory"), cl::cat(ReplayCat));
-
-cl::opt<std::string> ReplayPathFile("replay-path",
-                                    cl::desc("Specify a path file to replay"),
-                                    cl::value_desc("path file"),
-                                    cl::cat(ReplayCat));
-
 cl::opt<unsigned> MakeConcreteSymbolic(
     "make-concrete-symbolic",
     cl::desc("Probabilistic rate at which to make concrete reads symbolic, "
@@ -1486,12 +1471,7 @@ static int run_klee_on_function(int pArgc, char **pArgv, char **pEnvp,
                                 std::unique_ptr<KleeHandler> &handler,
                                 std::unique_ptr<Interpreter> &interpreter,
                                 llvm::Module *finalModule,
-                                llvm::Function *mainFn,
-                                std::vector<bool> &replayPath) {
-  if (ReplayPathFile != "") {
-    interpreter->setReplayPath(&replayPath);
-  }
-
+                                llvm::Function *mainFn) {
   auto startTime = std::time(nullptr);
 
   if (WriteXMLTests) {
@@ -2322,12 +2302,6 @@ int main(int argc, char **argv, char **envp) {
     pArgv[i] = pArg;
   }
 
-  std::vector<bool> replayPath;
-
-  if (ReplayPathFile != "") {
-    KleeHandler::loadPathFile(ReplayPathFile, replayPath);
-  }
-
   std::unique_ptr<KleeHandler> handler =
       std::make_unique<KleeHandler>(pArgc, pArgv);
 
@@ -2400,7 +2374,7 @@ int main(int argc, char **argv, char **envp) {
   externalsAndGlobalsCheck(finalModule);
 
   run_klee_on_function(pArgc, pArgv, pEnvp, handler, interpreter, finalModule,
-                       mainFn, replayPath);
+                       mainFn);
 
   paths.reset();
 

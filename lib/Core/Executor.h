@@ -188,17 +188,6 @@ private:
   /// Manager for everything related to targeted execution mode
   std::unique_ptr<TargetedExecutionManager> targetedExecutionManager;
 
-  /// When non-null the bindings that will be used for calls to
-  /// klee_make_symbolic in order replay.
-  const struct KTest *replayKTest;
-
-  /// When non-null a list of branch decisions to be used for replay.
-  const std::vector<bool> *replayPath;
-
-  /// The index into the current \ref replayKTest or \ref replayPath
-  /// object.
-  unsigned replayPosition;
-
   /// When non-null a list of "seed" inputs which will be used to
   /// drive execution.
   std::vector<ExecutingSeed> usingInitialSeeds;
@@ -757,18 +746,6 @@ public:
 
   void setSymbolicPathWriter(TreeStreamWriter *tsw) override {
     symPathWriter = tsw;
-  }
-
-  void setReplayKTest(const struct KTest *out) override {
-    assert(!replayPath && "cannot replay both buffer and path");
-    replayKTest = out;
-    replayPosition = 0;
-  }
-
-  void setReplayPath(const std::vector<bool> *path) override {
-    assert(!replayKTest && "cannot replay both buffer and path");
-    replayPath = path;
-    replayPosition = 0;
   }
 
   llvm::Module *setModule(
