@@ -11,7 +11,8 @@
 #define KLEE_SEEDINFO_H
 
 #include "klee/Expr/Assignment.h"
-
+#include "klee/ADT/PersistentSet.h"
+#include "klee/Module/Target.h"
 #include <deque>
 #include <set>
 
@@ -27,12 +28,14 @@ class MemoryObject;
 
 class ExecutingSeed {
 public:
-  mutable Assignment assignment;
+  Assignment assignment;
   unsigned maxInstructions = 0;
   mutable std::set<struct KTestObject *> used;
   mutable std::deque<ref<box<bool>>> coveredNew;
   mutable ref<box<bool>> coveredNewError = nullptr;
-  mutable unsigned inputPosition = 0;
+  unsigned inputPosition = 0;
+  unsigned parentId;
+  PersistentSet<ref<Target>> targets;
 
 public:
   ~ExecutingSeed() {}
@@ -41,15 +44,18 @@ public:
 
   explicit ExecutingSeed(unsigned maxInstructions,
                          std::deque<ref<box<bool>>> coveredNew = {},
-                         ref<box<bool>> coveredNewError = 0)
+                         ref<box<bool>> coveredNewError = 0,
+                         const PersistentSet<ref<Target>> targets = {})
       : maxInstructions(maxInstructions), coveredNew(coveredNew),
-        coveredNewError(coveredNewError) {}
+        coveredNewError(coveredNewError), targets(targets) {}
 
   explicit ExecutingSeed(Assignment assignment, unsigned maxInstructions,
                          std::deque<ref<box<bool>>> coveredNew,
-                         ref<box<bool>> coveredNewError)
+                         ref<box<bool>> coveredNewError,
+                         const PersistentSet<ref<Target>> &targets)
       : assignment(assignment), maxInstructions(maxInstructions),
-        coveredNew(coveredNew), coveredNewError(coveredNewError) {}
+        coveredNew(coveredNew), coveredNewError(coveredNewError),
+        targets(targets) {}
 
   static void kTestDeleter(KTest *ktest);
 };

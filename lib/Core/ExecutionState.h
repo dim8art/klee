@@ -518,6 +518,11 @@ public:
 
   inline void setTargeted(bool targeted) { isTargeted_ = targeted; }
 
+  inline void setTargets(const PersistentSet<ref<Target>> &targets) {
+    targets_ = targets;
+    areTargetsChanged_ = true;
+  }
+
   inline void setTargets(const TargetHashSet &targets) {
     targets_ = PersistentSet<ref<Target>>();
     for (auto target : targets) {
