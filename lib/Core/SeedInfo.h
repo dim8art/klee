@@ -29,13 +29,15 @@ class MemoryObject;
 
 class ExecutingSeed {
 public:
-  mutable Assignment assignment;
+  Assignment assignment;
   std::shared_ptr<KTest> input;
   unsigned maxInstructions = 0;
   std::set<struct KTestObject *> used;
   mutable std::deque<ref<box<bool>>> coveredNew;
   mutable ref<box<bool>> coveredNewError = nullptr;
   unsigned inputPosition = 0;
+  unsigned parentId;
+  PersistentSet<ref<Target>> targets;
 
 public:
   ~ExecutingSeed() {}
@@ -44,15 +46,19 @@ public:
 
   explicit ExecutingSeed(KTest *input, unsigned maxInstructions,
                          std::deque<ref<box<bool>>> coveredNew = {},
-                         ref<box<bool>> coveredNewError = 0)
+                         ref<box<bool>> coveredNewError = 0,
+                         const PersistentSet<ref<Target>> targets = {})
       : input(input, kTestDeleter), maxInstructions(maxInstructions),
-        coveredNew(coveredNew), coveredNewError(coveredNewError) {}
+        coveredNew(coveredNew), coveredNewError(coveredNewError),
+        targets(targets) {}
 
   explicit ExecutingSeed(Assignment assignment, unsigned maxInstructions,
                          std::deque<ref<box<bool>>> coveredNew,
-                         ref<box<bool>> coveredNewError)
+                         ref<box<bool>> coveredNewError,
+                         const PersistentSet<ref<Target>> &targets)
       : assignment(assignment), maxInstructions(maxInstructions),
-        coveredNew(coveredNew), coveredNewError(coveredNewError) {}
+        coveredNew(coveredNew), coveredNewError(coveredNewError),
+        targets(targets) {}
 
   KTestObject *getNextInput(const MemoryObject *mo, bool byName);
 

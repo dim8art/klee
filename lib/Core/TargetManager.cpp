@@ -170,7 +170,8 @@ void TargetManager::updateReached(ExecutionState &state) {
 
 void TargetManager::updateTargets(ExecutionState &state) {
   if (guidance == Interpreter::GuidanceKind::CoverageGuidance) {
-    if (targets(state).empty() && state.isStuck(MaxCyclesBeforeStuck)) {
+    if (targets(state).empty() && state.isStuck(MaxCyclesBeforeStuck) &&
+        !state.isSeeded) {
       state.setTargeted(true);
     }
     if (isTargeted(state) && targets(state).empty()) {

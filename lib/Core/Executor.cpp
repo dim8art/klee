@@ -4402,36 +4402,36 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
   }
 
   // just guess at how many to kill
-  auto states = objectManager->getStates();
+  const states_ty &states = objectManager->getStates();
   const auto numStates = states.size();
 
-  // randomly select states for early termination
-  std::vector<ExecutionState *> arr; // FIXME: expensive
-  for (ExecutionState *state : states) {
-    if (!state->isSeeded) {
-      arr.push_back(state);
-    }
-  }
-  auto toKill =
-      std::min(arr.size(), numStates - numStates * MaxMemory / totalUsage);
+  auto toKill = std::max(1UL, numStates - numStates * MaxMemory / totalUsage);
 
   if (toKill != 0) {
     klee_warning("killing %lu states (over memory cap: %luMB)", toKill,
                  totalUsage);
   }
-
-  for (unsigned i = 0, N = arr.size(); N > 0 && i < toKill; ++i, --N) {
-    unsigned idx = theRNG.getInt32() % N;
+  unsigned killed = 0;
+  for (states_ty::iterator it = states.begin(), ie = states.end();
+       it != ie && killed < toKill; ++it) {
     // Make two pulls to try and not hit a state that
-    // covered new code.
-    if (arr[idx]->isCoveredNew())
-      idx = theRNG.getInt32() % N;
+    // covered new code or a seeded state
+    if ((*it)->isCoveredNew() || (*it)->isSeeded)
+      continue;
 
-    std::swap(arr[idx], arr[N - 1]);
-    terminateStateEarly(*arr[N - 1], "Memory limit exceeded.",
+    terminateStateEarly(**it, "Memory limit exceeded.",
                         StateTerminationType::OutOfMemory);
+    killed++;
   }
-
+  for (states_ty::iterator it = states.begin(), ie = states.end();
+       it != ie && killed < toKill; ++it) {
+    // Kill some more if needed
+    if ((*it)->isCoveredNew() || (*it)->isSeeded) {
+      terminateStateEarly(**it, "Memory limit exceeded.",
+                          StateTerminationType::OutOfMemory);
+      killed++;
+    }
+  }
   return Executor::Full;
 }
 
@@ -4538,7 +4538,8 @@ void Executor::storeState(const ExecutionState &state, ExecutingSeed &res) {
     assert(false && "terminated state must have an assignment");
   }
   ExecutingSeed seed(assignment, state.steppedInstructions, state.coveredNew,
-                     state.coveredNewError);
+                     state.coveredNewError, state.targets());
+  seed.parentId = state.id;
   res = seed;
 }
 
@@ -4723,6 +4724,8 @@ bool Executor::reachedMaxSeedInstructions(ExecutionState *state) {
   if (siit->coveredNewError) {
     state->coveredNewError = siit->coveredNewError;
   }
+  state->setTargeted(true);
+  state->setTargets(siit->targets);
   seeds.erase(siit);
   seedMap->erase(state);
   objectManager->unseed(state);
@@ -4909,6 +4912,11 @@ void Executor::terminateStateEarly(ExecutionState &state, const Twine &message,
   if (reason <= StateTerminationType::EARLY) {
     assert(reason > StateTerminationType::EXIT);
     ++stats::terminationEarly;
+  }
+  if (state.isSeeded && (reason > StateTerminationType::EARLY ||
+                         reason == StateTerminationType::MaxCycles)) {
+    assert(!state.isSeeded &&
+           "seeded state should not terminate until interrupted");
   }
   if (RunForever && reason <= StateTerminationType::EARLY) {
     ExecutingSeed seed;
