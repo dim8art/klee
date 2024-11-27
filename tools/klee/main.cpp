@@ -286,6 +286,15 @@ cl::opt<bool>
 cl::OptionCategory ReplayCat("Replaying options",
                              "These options impact replaying of test cases.");
 
+cl::list<std::string> SeedOutFile("seed-file",
+                                  cl::desc(".ktest file to be used as seed"),
+                                  cl::cat(SeedingCat));
+
+cl::list<std::string>
+    SeedOutDir("seed-dir",
+               cl::desc("Directory with .ktest files to be used as seeds"),
+               cl::cat(SeedingCat));
+
 cl::opt<unsigned> MakeConcreteSymbolic(
     "make-concrete-symbolic",
     cl::desc("Probabilistic rate at which to make concrete reads symbolic, "
@@ -404,8 +413,6 @@ cl::opt<SAMultiplexKind> MultiplexForStaticAnalysis(
 
 namespace klee {
 
-extern cl::list<std::string> SeedOutFile;
-extern cl::list<std::string> SeedOutDir;
 extern cl::opt<std::string> MaxTime;
 extern cl::opt<std::string> FunctionCallReproduce;
 extern cl::opt<HaltExecution::Reason> DumpStatesOnHalt;

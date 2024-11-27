@@ -1,6 +1,6 @@
 // RUN: %clang %s -emit-llvm %O0opt -c -o %t1.bc
 // RUN: rm -rf %t1.klee-out
-// RUN: %klee --output-dir=%t1.klee-out --run-forever --search=bfs --max-memory=500 %t1.bc
+// RUN: %klee --output-dir=%t1.klee-out --store-early-states --search=bfs --max-memory=500 %t1.bc
 
 #include "klee/klee.h"
 int a[100];

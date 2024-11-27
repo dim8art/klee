@@ -87,12 +87,11 @@ cl::opt<bool> UseFairSearch(
         "(default=false)"),
     cl::init(false), cl::cat(SearchCat));
 
-} // namespace klee
-
-namespace klee {
-extern cl::opt<bool> RunForever;
-extern cl::list<std::string> SeedOutFile;
-extern cl::list<std::string> SeedOutDir;
+cl::opt<bool>
+    UseSeededSearch("use-seeded-search",
+                    cl::desc("Use seeded searcher (explores seeded states "
+                             "before unseeded) (default=false)"),
+                    cl::init(false), cl::cat(SearchCat));
 } // namespace klee
 
 void klee::initializeSearchOptions() {
@@ -205,8 +204,7 @@ Searcher *klee::constructUserSearcher(Executor &executor) {
   } else {
     searcher = constructBaseSearcher(executor);
   }
-  if (RunForever || SeedOutFile.begin() != SeedOutFile.end() ||
-      SeedOutDir.begin() != SeedOutDir.end()) {
+  if (UseSeededSearch) {
     searcher = new SeededSearcher(searcher);
   }
   llvm::raw_ostream &os = executor.getHandler().getInfoStream();

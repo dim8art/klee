@@ -230,18 +230,10 @@ cl::opt<HaltExecution::Reason> DumpStatesOnHalt(
                    "Dump test cases for all active states on exit (default)")),
     cl::cat(TestGenCat));
 
-cl::opt<bool> RunForever("run-forever",
+cl::opt<bool> StoreEarlyStates("store-early-states",
                          cl::desc("Store states when out of memory and explore "
                                   "them later (default=false)"),
                          cl::init(false), cl::cat(SeedingCat));
-cl::list<std::string>
-    SeedOutDir("seed-dir",
-               cl::desc("Directory with .ktest files to be used as seeds"),
-               cl::cat(SeedingCat));
-
-cl::list<std::string> SeedOutFile("seed-file",
-                                  cl::desc(".ktest file to be used as seed"),
-                                  cl::cat(SeedingCat));
 } // namespace klee
 
 namespace {
@@ -4626,7 +4618,7 @@ void Executor::run(ExecutionState *initialState) {
     if (usage == Full) {
       objectManager->updateSubscribers();
     }
-    if (RunForever && (searcher->empty() || usage == Low)) {
+    if (StoreEarlyStates && (searcher->empty() || usage == Low)) {
       std::vector<ExecutingSeed> seeds = uploadNewSeeds();
       if (!seeds.empty()) {
         ExecutionState *newSeededState =
@@ -4709,6 +4701,10 @@ bool Executor::reachedMaxSeedInstructions(ExecutionState *state) {
   seeds_ty &seeds = it->second;
 
   assert(!seeds.empty());
+  llvm::errs()<<seeds.begin()->maxInstructions << " " << state->steppedInstructions << " "<<seeds.size()<< "\n";
+  seeds.begin()->assignment.dump();
+  llvm::errs()<<"====\n";
+  seeds.back().assignment.dump();
   assert(seeds.begin()->maxInstructions >= state->steppedInstructions &&
          "state stepped instructions exceeded seed max instructions");
   if (seeds.size() != 1) {
@@ -4918,7 +4914,7 @@ void Executor::terminateStateEarly(ExecutionState &state, const Twine &message,
     assert(!state.isSeeded &&
            "seeded state should not terminate until interrupted");
   }
-  if (RunForever && reason <= StateTerminationType::EARLY) {
+  if (StoreEarlyStates && reason <= StateTerminationType::EARLY) {
     ExecutingSeed seed;
     storeState(state, seed);
     storedSeeds->push_back(seed);
