@@ -160,17 +160,6 @@ cl::opt<bool>
                                       "and return null (default=false)"),
                              cl::cat(ExecCat));
 
-cl::opt<size_t> OSCopySizeMemoryCheckThreshold(
-    "os-copy-size-mem-check-threshold", cl::init(30000),
-    cl::desc("Check memory usage when this amount of bytes dense OS is copied"),
-    cl::cat(ExecCat));
-
-cl::opt<size_t> StackCopySizeMemoryCheckThreshold(
-    "stack-copy-size-mem-check-threshold", cl::init(30000),
-    cl::desc("Check memory usage when state with stack this big (in bytes) is "
-             "copied"),
-    cl::cat(ExecCat));
-
 namespace {
 
 /*** Lazy initialization options ***/
@@ -1138,9 +1127,8 @@ bool Executor::branchingPermitted(ExecutionState &state, unsigned N) {
   if (state.isSeeded) {
     return true;
   }
-  if ((MaxMemoryInhibit && atMemoryLimit) ||
-      state.forkDisabled || inhibitForking ||
-      (MaxForks != ~0u && stats::forks >= MaxForks)) {
+  if ((MaxMemoryInhibit && atMemoryLimit) || state.forkDisabled ||
+      inhibitForking || (MaxForks != ~0u && stats::forks >= MaxForks)) {
 
     if (MaxMemoryInhibit && atMemoryLimit)
       klee_warning_once(0, "skipping fork (memory cap exceeded)");
@@ -1333,6 +1321,7 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
   seeds_ty falseSeeds;
   time::Span timeout = coreSolverTimeout;
   bool shouldCheckTrueBlock = true, shouldCheckFalseBlock = true;
+
 
   if (!isInternal) {
     shouldCheckTrueBlock = canReachSomeTargetFromBlock(current, ifTrueBlock);
@@ -1605,12 +1594,10 @@ ref<klee::ConstantExpr> Executor::toConstant(ExecutionState &state, ref<Expr> e,
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(e))
     return CE;
 
-  ref<ConstantExpr> value = getValueFromSeeds(state, e);
-  if (!value) {
-    [[maybe_unused]] bool success =
-        solver->getValue(state.constraints.cs(), e, value, state.queryMetaData);
-    assert(success && "FIXME: Unhandled solver failure");
-  }
+  ref<ConstantExpr> value;
+  [[maybe_unused]] bool success =
+      solver->getValue(state.constraints.cs(), e, value, state.queryMetaData);
+  assert(success && "FIXME: Unhandled solver failure");
 
   std::string str;
   llvm::raw_string_ostream os(str);
@@ -1624,21 +1611,6 @@ ref<klee::ConstantExpr> Executor::toConstant(ExecutionState &state, ref<Expr> e,
     klee_warning_once(reason.c_str(), "%s", os.str().c_str());
 
   return value;
-}
-
-ref<klee::ConstantExpr> Executor::getValueFromSeeds(ExecutionState &state,
-                                                    ref<Expr> e) {
-  auto found = seedMap->find(&state);
-  if (found == seedMap->end())
-    return nullptr;
-
-  auto seeds = found->second;
-  for (auto const &seed : seeds) {
-    auto value = seed.assignment.evaluate(e);
-    if (isa<ConstantExpr>(value))
-      return value;
-  }
-  return nullptr;
 }
 
 ref<klee::ConstantPointerExpr>
@@ -2772,12 +2744,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       auto ifFalseBlock = kf->blockMap[bi->getSuccessor(1)];
       Executor::StatePair branches =
           fork(state, cond, ifTrueBlock, ifFalseBlock, BranchType::Conditional);
-
-      if (branches.first && branches.second) {
-        maxNewStateStackSize =
-            std::max(maxNewStateStackSize,
-                     branches.first->stack.stackRegisterSize() * 8);
-      }
 
       // NOTE: There is a hidden dependency here, markBranchVisited
       // requires that we still be in the context of the branch
@@ -4365,19 +4331,26 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
   if (!MaxMemory)
     return None;
 
+  const auto &states = objectManager->getStates();
+  const auto numStates = states.size();
+  const auto lastMaxNumStates =
+      std::max(1UL, (unsigned long)(MaxMemory / lastWeightOfState));
+
   // We need to avoid calling GetTotalMallocUsage() often because it
   // is O(elts on freelist). This is really bad since we start
   // to pummel the freelist once we hit the memory cap.
   // every 65536 instructions
   if ((stats::instructions & 0xFFFFU) != 0 &&
-      maxNewWriteableOSSize < OSCopySizeMemoryCheckThreshold &&
-
-      maxNewStateStackSize < StackCopySizeMemoryCheckThreshold)
-    return None;
+      numStates < lastMaxNumStates * 0.4)
+          return None;
 
   // check memory limit
 
   const auto totalUsage = getMemoryUsage() >> 20U;
+  const auto weightOfState = std::max(0.001, (double)totalUsage / numStates);
+  lastWeightOfState = weightOfState;
+  const auto maxNumStates =
+      std::max(1UL, (unsigned long)(MaxMemory / weightOfState));
 
   if (MemoryTriggerCoverOnTheFly && totalUsage > MaxMemory * 0.75) {
     klee_warning_once(0,
@@ -4385,25 +4358,28 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
                       totalUsage);
     coverOnTheFly = CoverOnTheFly;
   }
-
+  // just guess at how many to kill
   // only terminate states when threshold (+1%) exceeded
-  if (totalUsage < MaxMemory * 0.6) {
+  if (totalUsage < MaxMemory * 0.6 && numStates < maxNumStates * 0.4) {
     return Executor::Low;
-  } else if (totalUsage <= MaxMemory * 1.01) {
+  } else if (totalUsage <= MaxMemory * 1.01 &&
+             numStates <= maxNumStates * 0.7) {
     return Executor::High;
   }
 
-  // just guess at how many to kill
-  const states_ty &states = objectManager->getStates();
-  const auto numStates = states.size();
+  if (totalUsage > MaxMemory * 1.01 && numStates <= 2) {
+    haltExecution = HaltExecution::MaxMemory;
+    return Executor::None;
+  }
 
-  auto toKill = std::max(1UL, numStates - numStates * MaxMemory / totalUsage);
+  auto toKill =
+      std::min(numStates - 1, numStates - (unsigned long)(maxNumStates * 0.4));
 
   if (toKill != 0) {
-    klee_warning("killing %lu states (over memory cap: %luMB)", toKill,
+    klee_warning("killing %lu states (total memory usage: %luMB)", toKill,
                  totalUsage);
   }
-  unsigned killed = 0;
+  unsigned long killed = 0;
   for (states_ty::iterator it = states.begin(), ie = states.end();
        it != ie && killed < toKill; ++it) {
     // Make two pulls to try and not hit a state that
@@ -4424,6 +4400,10 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
       killed++;
     }
   }
+  if (toKill != 0) {
+    klee_warning("stop killing");
+  }
+
   return Executor::Full;
 }
 
@@ -4483,18 +4463,16 @@ const KFunction *Executor::getKFunction(const llvm::Function *f) const {
 }
 
 std::vector<ExecutingSeed> Executor::uploadNewSeeds() {
+  // just guess at how many to kill
+  auto &states = objectManager->getStates();
+  const auto numStates = std::max(1UL, states.size());
+  const auto maxNumStates =
+      std::max(1UL, (unsigned long)(MaxMemory / lastWeightOfState));
   std::vector<ExecutingSeed> seeds;
-  if(!usingInitialSeeds.empty()){
-    seeds = usingInitialSeeds;
-    usingInitialSeeds.clear();
-    return seeds;
-  }
-
-  unsigned toUpload = 0;
-  if(UploadPercentage){
-    toUpload = (storedSeeds->size() * UploadPercentage) / 100;
-    if(toUpload == 0) toUpload = 1;
-  }
+  unsigned long numStoredSeeds = storedSeeds->size();
+  unsigned long toUpload =
+      numStates < maxNumStates * 0.4 ? maxNumStates * 0.4 - numStates : 0;
+  toUpload = std::min(toUpload, numStoredSeeds);
 
   while ((!toUpload || seeds.size() <= toUpload) && !storedSeeds->empty()) {
     seeds.push_back(storedSeeds->front());
@@ -4521,9 +4499,11 @@ void Executor::initialSeed(ExecutionState &initialState,
 
 void Executor::storeState(const ExecutionState &state, ExecutingSeed &res) {
   ref<SolverResponse> response;
+  solver->setTimeout(coreSolverTimeout);
   bool success =
       solver->getResponse(state.constraints.cs(), Expr::createFalse(), response,
                           state.queryMetaData);
+  solver->setTimeout(time::Span());
   assert(success && "unable to get symbolic solution");
   Assignment assignment;
   if (!response->tryGetInitialValues(assignment.bindings)) {
@@ -4693,42 +4673,43 @@ void Executor::executeAction(ref<SearcherAction> action) {
   timers.invoke();
 }
 
-bool Executor::reachedMaxSeedInstructions(ExecutionState *state) {
+void Executor::unseedIfReachedMacSeedInstructions(ExecutionState *state) {
   assert(state->isSeeded);
   auto it = seedMap->find(state);
   assert(it != seedMap->end());
 
   seeds_ty &seeds = it->second;
 
-  assert(!seeds.empty());
-  llvm::errs()<<seeds.begin()->maxInstructions << " " << state->steppedInstructions << " "<<seeds.size()<< "\n";
-  seeds.begin()->assignment.dump();
-  llvm::errs()<<"====\n";
-  seeds.back().assignment.dump();
-  assert(seeds.begin()->maxInstructions >= state->steppedInstructions &&
-         "state stepped instructions exceeded seed max instructions");
-  if (seeds.size() != 1) {
-    return false;
-  }
+  assert(seeds.size() == 1);
   seeds_ty::iterator siit = seeds.begin();
+  assert(siit->maxInstructions >= state->steppedInstructions &&
+         "state stepped instructions exceeded seed max instructions");
 
-  if (!(siit->maxInstructions &&
-        siit->maxInstructions == state->steppedInstructions)) {
-    return false;
+  if (siit->maxInstructions &&
+      siit->maxInstructions == state->steppedInstructions) {
+    state->coveredNew = siit->coveredNew;
+    if (siit->coveredNewError) {
+      state->coveredNewError = siit->coveredNewError;
+    }
+    if (!siit->targets.empty()) {
+      state->setTargeted(true);
+      state->setTargets(siit->targets);
+    }
+    seeds.clear();
   }
-  state->coveredNew = siit->coveredNew;
-  if (siit->coveredNewError) {
-    state->coveredNewError = siit->coveredNewError;
+
+  assert(seeds.empty() ||
+         seeds.begin()->maxInstructions != state->steppedInstructions);
+
+  if (!seeds.empty()) {
+    return;
   }
-  state->setTargeted(true);
-  state->setTargets(siit->targets);
-  seeds.erase(siit);
+
   seedMap->erase(state);
   objectManager->unseed(state);
   if (seedMap->size() == 0) {
     klee_message("Seeding done!\n");
   }
-  return true;
 }
 
 void Executor::goForward(ref<ForwardAction> action) {
@@ -4747,6 +4728,9 @@ void Executor::goForward(ref<ForwardAction> action) {
   if (targetManager) {
     targetManager->pullGlobal(state);
   }
+  if (state.isSeeded) {
+    unseedIfReachedMacSeedInstructions(&state);
+  }
   if (targetCalculator && TrackCoverage != TrackCoverageBy::None &&
       state.multiplexKF && functionsByModule.modules.size() > 1 &&
       targetCalculator->isCovered(state.multiplexKF)) {
@@ -4762,10 +4746,7 @@ void Executor::goForward(ref<ForwardAction> action) {
   } else if (state.isSymbolicCycled(MaxSymbolicCycles)) {
     terminateStateEarly(state, "max-sym-cycles exceeded.",
                         StateTerminationType::MaxCycles);
-  } else if (!state.isSeeded || !reachedMaxSeedInstructions(&state)) {
-    maxNewWriteableOSSize = 0;
-    maxNewStateStackSize = 0;
-
+  } else {
     KInstruction *ki = state.pc;
     stepInstruction(state);
     executeInstruction(state, ki);
@@ -6315,7 +6296,6 @@ void Executor::executeMemoryOperation(
       terminateStateOnSolverError(*state, "Query timed out (bounds check).");
       return;
     }
-    solver->setTimeout(time::Span());
 
     bool mustBeInBounds = !isa<InvalidResponse>(response);
     if (mustBeInBounds) {
@@ -6333,8 +6313,6 @@ void Executor::executeMemoryOperation(
       }
       if (isWrite) {
         ObjectState *wos = state->addressSpace.getWriteable(mo, os);
-        maxNewWriteableOSSize =
-            std::max(maxNewWriteableOSSize, wos->getSparseStorageEntries());
         if (wos->readOnly) {
           terminateStateOnProgramError(
               *state,
@@ -6445,8 +6423,6 @@ void Executor::executeMemoryOperation(
           const ObjectState *os = op.second.get();
 
           ObjectState *wos = state->addressSpace.getWriteable(mo, os);
-          maxNewWriteableOSSize =
-              std::max(maxNewWriteableOSSize, wos->getSparseStorageEntries());
           if (wos->readOnly) {
             branches =
                 forkInternal(*state, resolveConditions[i], BranchType::MemOp);
@@ -6530,8 +6506,6 @@ void Executor::executeMemoryOperation(
 
       if (isWrite) {
         ObjectState *wos = bound->addressSpace.getWriteable(mo, os);
-        maxNewWriteableOSSize =
-            std::max(maxNewWriteableOSSize, wos->getSparseStorageEntries());
         if (wos->readOnly) {
           terminateStateOnProgramError(
               *bound,
@@ -7606,8 +7580,6 @@ void Executor::doImpliedValueConcretization(ExecutionState &state, ref<Expr> e,
         assert(!os->readOnly &&
                "not possible? read only object with static read?");
         ObjectState *wos = state.addressSpace.getWriteable(mo, os);
-        maxNewWriteableOSSize =
-            std::max(maxNewWriteableOSSize, wos->getSparseStorageEntries());
         wos->write(CE, it->second);
       }
     }

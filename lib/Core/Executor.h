@@ -133,8 +133,7 @@ private:
   decltype(__ctype_toupper_loc()) c_type_toupper_addr;
 #endif
 
-  size_t maxNewWriteableOSSize = 0;
-  size_t maxNewStateStackSize = 0;
+  double lastWeightOfState = 0.001;
 
   size_t multiplexReached = 0;
 
@@ -572,12 +571,6 @@ private:
   ref<klee::ConstantExpr> toConstant(ExecutionState &state, ref<Expr> e,
                                      const std::string &reason);
 
-  /// Evaluate the given expression under each seed, and return the
-  /// first one that results in a constant, if such a seed exist.  Otherwise,
-  /// return the non-constant evaluation of the expression under one of the
-  /// seeds.
-  ref<klee::ConstantExpr> getValueFromSeeds(ExecutionState &state, ref<Expr> e);
-
   ref<klee::ConstantPointerExpr> toConstantPointer(ExecutionState &state,
                                                    ref<PointerExpr> e,
                                                    const char *purpose);
@@ -726,7 +719,7 @@ private:
 
   void executeAction(ref<SearcherAction> action);
 
-  bool reachedMaxSeedInstructions(ExecutionState *state);
+  void unseedIfReachedMacSeedInstructions(ExecutionState *state);
   void goForward(ref<ForwardAction> action);
 
   const KInstruction *getKInst(const llvm::Instruction *ints) const;

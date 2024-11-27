@@ -920,9 +920,8 @@ void DiscreteTimeFairSearcher::printName(llvm::raw_ostream &os) {
 
 //
 
-SeededSearcher::SeededSearcher(Searcher *_searcher) : baseSearcher(_searcher) {
-  seededSearcher = std::unique_ptr<BFSSearcher>(new BFSSearcher());
-}
+SeededSearcher::SeededSearcher(Searcher *baseSearcher, Searcher *seededSearcher)
+    : baseSearcher(baseSearcher), seededSearcher(seededSearcher) {}
 
 ExecutionState &SeededSearcher::selectState() {
   if (!seededSearcher->empty()) {

@@ -12,7 +12,9 @@
 
 #include "ExecutionState.h"
 #include "klee/ADT/ImmutableList.h"
+#include "klee/ADT/PersistentSet.h"
 #include "klee/Expr/Assignment.h"
+#include "klee/Module/Target.h"
 
 #include <deque>
 #include <set>
