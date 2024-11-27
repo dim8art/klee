@@ -219,10 +219,14 @@ cl::opt<HaltExecution::Reason> DumpStatesOnHalt(
                    "Dump test cases for all active states on exit (default)")),
     cl::cat(TestGenCat));
 
-cl::opt<bool> StoreEarlyStates("store-early-states",
-                         cl::desc("Store states when out of memory and explore "
-                                  "them later (default=false)"),
-                         cl::init(false), cl::cat(SeedingCat));
+cl::opt<bool>
+    StoreEarlyStates("store-early-states",
+                     cl::desc("Store states when out of memory and explore "
+                              "them later (default=false)"),
+                     cl::init(false), cl::cat(SeedingCat));
+
+extern llvm::cl::opt<bool> UseSeededSearch;
+
 } // namespace klee
 
 namespace {
@@ -1322,14 +1326,13 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
   time::Span timeout = coreSolverTimeout;
   bool shouldCheckTrueBlock = true, shouldCheckFalseBlock = true;
 
-
   if (!isInternal) {
     shouldCheckTrueBlock = canReachSomeTargetFromBlock(current, ifTrueBlock);
     shouldCheckFalseBlock = canReachSomeTargetFromBlock(current, ifFalseBlock);
   }
 
   if (!isSeeding) {
-    assert(seedMap->empty());
+    assert(!UseSeededSearch || seedMap->empty());
   } else {
     std::map<ExecutionState *, seeds_ty>::iterator it = seedMap->find(&current);
     assert(it != seedMap->end());
@@ -4342,7 +4345,7 @@ Executor::MemoryUsage Executor::checkMemoryUsage() {
   // every 65536 instructions
   if ((stats::instructions & 0xFFFFU) != 0 &&
       numStates < lastMaxNumStates * 0.4)
-          return None;
+    return None;
 
   // check memory limit
 
@@ -4463,12 +4466,17 @@ const KFunction *Executor::getKFunction(const llvm::Function *f) const {
 }
 
 std::vector<ExecutingSeed> Executor::uploadNewSeeds() {
+  std::vector<ExecutingSeed> seeds;
+  if (!usingInitialSeeds.empty()) {
+    seeds = usingInitialSeeds;
+    usingInitialSeeds.clear();
+    return seeds;
+  }
   // just guess at how many to kill
   auto &states = objectManager->getStates();
   const auto numStates = std::max(1UL, states.size());
   const auto maxNumStates =
       std::max(1UL, (unsigned long)(MaxMemory / lastWeightOfState));
-  std::vector<ExecutingSeed> seeds;
   unsigned long numStoredSeeds = storedSeeds->size();
   unsigned long toUpload =
       numStates < maxNumStates * 0.4 ? maxNumStates * 0.4 - numStates : 0;
@@ -4680,31 +4688,25 @@ void Executor::unseedIfReachedMacSeedInstructions(ExecutionState *state) {
 
   seeds_ty &seeds = it->second;
 
-  assert(seeds.size() == 1);
-  seeds_ty::iterator siit = seeds.begin();
-  assert(siit->maxInstructions >= state->steppedInstructions &&
+  assert(!seeds.empty());
+  assert(seeds.begin()->maxInstructions >= state->steppedInstructions &&
          "state stepped instructions exceeded seed max instructions");
-
-  if (siit->maxInstructions &&
-      siit->maxInstructions == state->steppedInstructions) {
-    state->coveredNew = siit->coveredNew;
-    if (siit->coveredNewError) {
-      state->coveredNewError = siit->coveredNewError;
-    }
-    if (!siit->targets.empty()) {
-      state->setTargeted(true);
-      state->setTargets(siit->targets);
-    }
-    seeds.clear();
-  }
-
-  assert(seeds.empty() ||
-         seeds.begin()->maxInstructions != state->steppedInstructions);
-
-  if (!seeds.empty()) {
+  if (seeds.size() != 1) {
     return;
   }
+  seeds_ty::iterator siit = seeds.begin();
 
+  if (!(siit->maxInstructions &&
+        siit->maxInstructions == state->steppedInstructions)) {
+    return;
+  }
+  state->coveredNew = siit->coveredNew;
+  if (siit->coveredNewError) {
+    state->coveredNewError = siit->coveredNewError;
+  }
+  state->setTargeted(true);
+  state->setTargets(siit->targets);
+  seeds.erase(siit);
   seedMap->erase(state);
   objectManager->unseed(state);
   if (seedMap->size() == 0) {
@@ -4853,8 +4855,7 @@ HaltExecution::Reason fromStateTerminationType(StateTerminationType t) {
 
 void Executor::terminateState(ExecutionState &state,
                               StateTerminationType terminationType) {
-  if (seedMap->find(&state) != seedMap->end()) {
-    klee_warning("terminating state while replaying");
+  if (state.isSeeded) {
     seedMap->erase(&state);
   }
   state.terminationReasonType = fromStateTerminationType(terminationType);
@@ -4888,6 +4889,9 @@ void Executor::terminateStateEarly(ExecutionState &state, const Twine &message,
                                    StateTerminationType reason) {
   if (reason <= StateTerminationType::EARLY) {
     assert(reason > StateTerminationType::EXIT);
+    if (state.isSeeded) {
+      klee_warning("early termination while replaying");
+    }
     ++stats::terminationEarly;
   }
   if (state.isSeeded && (reason > StateTerminationType::EARLY ||

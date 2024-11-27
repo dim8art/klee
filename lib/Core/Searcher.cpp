@@ -987,6 +987,7 @@ void SeededSearcher::update(
     baseSearcher->update(current, addedUnseededStates, removedUnseededStates);
     seededSearcher->update(nullptr, addedSeededStates, removedSeededStates);
   } else {
+    llvm::errs()<<"memememem";
     baseSearcher->update(nullptr, addedUnseededStates, removedUnseededStates);
     seededSearcher->update(nullptr, addedSeededStates, removedSeededStates);
   }
