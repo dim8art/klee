@@ -933,63 +933,77 @@ ExecutionState &SeededSearcher::selectState() {
 void SeededSearcher::update(
     ExecutionState *current, const std::vector<ExecutionState *> &addedStates,
     const std::vector<ExecutionState *> &removedStates) {
-  std::vector<ExecutionState *> addedUnseededStates;
-  std::vector<ExecutionState *> addedSeededStates;
-  std::vector<ExecutionState *> removedUnseededStates;
-  std::vector<ExecutionState *> removedSeededStates;
-
-  // process seed/unseed of current
-  if (current) {
-    if (current->isSeeded) {
-      if (baseSearcherStates.count(current) != 0) {
-        baseSearcherStates.erase(current);
-        baseSearcher->update(nullptr, {}, {current});
-      }
-      if (seededSearcherStates.count(current) == 0) {
-        seededSearcherStates.insert(current);
-        seededSearcher->update(nullptr, {current}, {});
-      }
-    } else {
-      if (seededSearcherStates.count(current) != 0) {
-        seededSearcherStates.erase(current);
-        seededSearcher->update(nullptr, {}, {current});
-      }
-      if (baseSearcherStates.count(current) == 0) {
-        baseSearcherStates.insert(current);
-        baseSearcher->update(nullptr, {current}, {});
-      }
-    }
+  bool currentUpdated = false;
+  if (std::find(addedStates.begin(), addedStates.end(), current) ==
+          addedStates.end()) {
+    currentUpdated = updateCurrent(current);
   }
 
-  for (auto state : addedStates) {
-    if (state->isSeeded && seededSearcherStates.count(state) == 0) {
+  for (ExecutionState *state : addedStates) {
+    if (state->isSeeded) {
       addedSeededStates.push_back(state);
       seededSearcherStates.insert(state);
-    } else if (!state->isSeeded && baseSearcherStates.count(state) == 0) {
+    } else {
       addedUnseededStates.push_back(state);
       baseSearcherStates.insert(state);
     }
   }
-  for (auto state : removedStates) {
-    if (state->isSeeded && seededSearcherStates.count(state) != 0) {
+
+  for (ExecutionState *state : removedStates) {
+    if (state->isSeeded) {
       removedSeededStates.push_back(state);
       seededSearcherStates.erase(state);
-    } else if (!state->isSeeded && baseSearcherStates.count(state) != 0) {
+    } else {
       removedUnseededStates.push_back(state);
       baseSearcherStates.erase(state);
     }
   }
 
-  if (current && current->isSeeded) {
+  if (!current || currentUpdated) {
+    baseSearcher->update(nullptr, addedUnseededStates, removedUnseededStates);
+    seededSearcher->update(nullptr, addedSeededStates, removedSeededStates);
+  } else if (current->isSeeded) {
     baseSearcher->update(nullptr, addedUnseededStates, removedUnseededStates);
     seededSearcher->update(current, addedSeededStates, removedSeededStates);
-  } else if (current && !current->isSeeded) {
+  } else if (!current->isSeeded) {
     baseSearcher->update(current, addedUnseededStates, removedUnseededStates);
     seededSearcher->update(nullptr, addedSeededStates, removedSeededStates);
+  }
+
+  addedUnseededStates.clear();
+  addedSeededStates.clear();
+  removedUnseededStates.clear();
+  removedSeededStates.clear();
+}
+
+bool SeededSearcher::updateCurrent(ExecutionState *current) {
+  if (!current) {
+    return false;
+  }
+  if (current->isSeeded) {
+    if (baseSearcherStates.count(current) == 0) {
+      assert(seededSearcherStates.count(current) != 0);
+      return false;
+    } else {
+      assert(seededSearcherStates.count(current) == 0);
+      baseSearcherStates.erase(current);
+      seededSearcherStates.insert(current);
+      baseSearcher->update(nullptr, {}, {current});
+      seededSearcher->update(nullptr, {current}, {});
+      return true;
+    }
   } else {
-    llvm::errs()<<"memememem";
-    baseSearcher->update(nullptr, addedUnseededStates, removedUnseededStates);
-    seededSearcher->update(nullptr, addedSeededStates, removedSeededStates);
+    if (seededSearcherStates.count(current) == 0) {
+      assert(baseSearcherStates.count(current) != 0);
+      return false;
+    } else {
+      assert(baseSearcherStates.count(current) == 0);
+      seededSearcherStates.erase(current);
+      baseSearcherStates.insert(current);
+      seededSearcher->update(nullptr, {}, {current});
+      baseSearcher->update(nullptr, {current}, {});
+      return true;
+    }
   }
 }
 

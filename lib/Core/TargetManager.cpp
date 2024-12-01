@@ -170,6 +170,7 @@ void TargetManager::updateReached(ExecutionState &state) {
 
 void TargetManager::updateTargets(ExecutionState &state) {
   if (state.isSeeded) {
+    assert(!isTargeted(state));
     return;
   }
   if (guidance == Interpreter::GuidanceKind::CoverageGuidance) {

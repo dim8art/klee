@@ -425,6 +425,10 @@ class SeededSearcher final : public Searcher {
   std::unique_ptr<Searcher> seededSearcher;
   states_ty baseSearcherStates;
   states_ty seededSearcherStates;
+  std::vector<ExecutionState *> addedUnseededStates;
+  std::vector<ExecutionState *> addedSeededStates;
+  std::vector<ExecutionState *> removedUnseededStates;
+  std::vector<ExecutionState *> removedSeededStates;
 
 public:
   explicit SeededSearcher(Searcher *baseSearcher, Searcher *seededSearcher);
@@ -434,6 +438,7 @@ public:
   void update(ExecutionState *current,
               const std::vector<ExecutionState *> &addedStates,
               const std::vector<ExecutionState *> &removedStates) override;
+  bool updateCurrent(ExecutionState *current);
   ~SeededSearcher() override = default;
   bool empty() override;
   void printName(llvm::raw_ostream &os) override;

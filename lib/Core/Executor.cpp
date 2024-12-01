@@ -475,9 +475,9 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
                    InterpreterHandler *ih)
     : Interpreter(opts), interpreterHandler(ih), searcher(nullptr),
       externalDispatcher(new ExternalDispatcher(ctx)), statsTracker(0),
-      pathWriter(0), symPathWriter(0),
-      specialFunctionHandler(0), timers{time::Span(TimerInterval)},
-      guidanceKind(opts.Guidance), codeGraphInfo(new CodeGraphInfo()),
+      pathWriter(0), symPathWriter(0), specialFunctionHandler(0),
+      timers{time::Span(TimerInterval)}, guidanceKind(opts.Guidance),
+      codeGraphInfo(new CodeGraphInfo()),
       distanceCalculator(new DistanceCalculator(*codeGraphInfo)),
       targetCalculator(new TargetCalculator(*codeGraphInfo)),
       targetManager(new TargetManager(guidanceKind, *distanceCalculator,
@@ -4681,7 +4681,7 @@ void Executor::executeAction(ref<SearcherAction> action) {
   timers.invoke();
 }
 
-void Executor::unseedIfReachedMacSeedInstructions(ExecutionState *state) {
+void Executor::unseedIfReachedMaxSeedInstructions(ExecutionState *state) {
   assert(state->isSeeded);
   auto it = seedMap->find(state);
   assert(it != seedMap->end());
@@ -4704,8 +4704,9 @@ void Executor::unseedIfReachedMacSeedInstructions(ExecutionState *state) {
   if (siit->coveredNewError) {
     state->coveredNewError = siit->coveredNewError;
   }
-  state->setTargeted(true);
-  state->setTargets(siit->targets);
+  if (siit->isTargeted) {
+    targetManager->makeTargeted(*state, siit->targets);
+  }
   seeds.erase(siit);
   seedMap->erase(state);
   objectManager->unseed(state);
@@ -4731,7 +4732,7 @@ void Executor::goForward(ref<ForwardAction> action) {
     targetManager->pullGlobal(state);
   }
   if (state.isSeeded) {
-    unseedIfReachedMacSeedInstructions(&state);
+    unseedIfReachedMaxSeedInstructions(&state);
   }
   if (targetCalculator && TrackCoverage != TrackCoverageBy::None &&
       state.multiplexKF && functionsByModule.modules.size() > 1 &&

@@ -33,12 +33,13 @@ class ExecutingSeed {
 public:
   Assignment assignment;
   std::shared_ptr<KTest> input;
-  unsigned maxInstructions = 0;
+  unsigned maxInstructions;
   std::set<struct KTestObject *> used;
   mutable std::deque<ref<box<bool>>> coveredNew;
   mutable ref<box<bool>> coveredNewError = nullptr;
   unsigned inputPosition = 0;
   unsigned parentId;
+  bool isTargeted;
   PersistentSet<ref<Target>> targets;
 
 public:
@@ -46,21 +47,23 @@ public:
 
   ExecutingSeed() {}
 
-  explicit ExecutingSeed(KTest *input, unsigned maxInstructions,
+  explicit ExecutingSeed(KTest *input, unsigned maxInstructions = 0,
                          std::deque<ref<box<bool>>> coveredNew = {},
                          ref<box<bool>> coveredNewError = 0,
-                         const PersistentSet<ref<Target>> targets = {})
+                         const PersistentSet<ref<Target>> targets = {},
+                         bool isTargeted = 0)
       : input(input, kTestDeleter), maxInstructions(maxInstructions),
         coveredNew(coveredNew), coveredNewError(coveredNewError),
-        targets(targets) {}
+        targets(targets), isTargeted(isTargeted) {}
 
-  explicit ExecutingSeed(Assignment assignment, unsigned maxInstructions,
-                         std::deque<ref<box<bool>>> coveredNew,
-                         ref<box<bool>> coveredNewError,
-                         const PersistentSet<ref<Target>> &targets)
+  explicit ExecutingSeed(Assignment assignment, unsigned maxInstructions = 0,
+                         std::deque<ref<box<bool>>> coveredNew = {},
+                         ref<box<bool>> coveredNewError = 0,
+                         const PersistentSet<ref<Target>> targets = {},
+                         bool isTargeted = 0)
       : assignment(assignment), maxInstructions(maxInstructions),
         coveredNew(coveredNew), coveredNewError(coveredNewError),
-        targets(targets) {}
+        targets(targets), isTargeted(isTargeted) {}
 
   KTestObject *getNextInput(const MemoryObject *mo, bool byName);
 
