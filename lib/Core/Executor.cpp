@@ -4512,7 +4512,10 @@ void Executor::storeState(const ExecutionState &state, ExecutingSeed &res) {
       solver->getResponse(state.constraints.cs(), Expr::createFalse(), response,
                           state.queryMetaData);
   solver->setTimeout(time::Span());
-  assert(success && "unable to get symbolic solution");
+  if(!success){
+    assert(false && "unable to get symbolic solution");
+    return;
+  }
   Assignment assignment;
   if (!response->tryGetInitialValues(assignment.bindings)) {
     assert(false && "terminated state must have an assignment");
