@@ -39,8 +39,8 @@ public:
   mutable ref<box<bool>> coveredNewError = nullptr;
   unsigned inputPosition = 0;
   unsigned parentId;
-  bool isTargeted;
   PersistentSet<ref<Target>> targets;
+  bool isTargeted;
 
 public:
   ~ExecutingSeed() {}
