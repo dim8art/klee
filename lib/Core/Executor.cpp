@@ -4518,7 +4518,7 @@ void Executor::storeState(const ExecutionState &state, ExecutingSeed &res) {
     assert(false && "terminated state must have an assignment");
   }
   ExecutingSeed seed(assignment, state.steppedInstructions, state.coveredNew,
-                     state.coveredNewError, state.targets(), state.isTargeted);
+                     state.coveredNewError, state.targets(), state.isTargeted());
   seed.parentId = state.id;
   res = seed;
 }
